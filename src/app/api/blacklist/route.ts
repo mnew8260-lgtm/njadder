@@ -5,10 +5,19 @@ import { getCurrentUser } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+async function requireApproved() {
+  const user = await getCurrentUser();
+  if (!user) return { error: NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 }), user: null };
+  if (user.role !== "admin" && user.status !== "approved") {
+    return { error: NextResponse.json({ ok: false, error: "Account pending approval", needsApproval: true }, { status: 403 }), user: null };
+  }
+  return { error: null, user };
+}
+
 // GET — list user's blacklist
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
+  const { error, user } = await requireApproved();
+  if (error || !user) return error;
   try {
     const items = await BlacklistService.list(user.id);
     const count = await BlacklistService.count(user.id);
@@ -20,8 +29,8 @@ export async function GET() {
 
 // POST — add single / bulk / clear
 export async function POST(req: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
+  const { error, user } = await requireApproved();
+  if (error || !user) return error;
   try {
     const body = await req.json();
     const { action, telegramId, reason, fullName, username, bulkText } = body;
@@ -49,10 +58,10 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// DELETE — remove single item (by id) or all (by ownerId)
+// DELETE — remove single item
 export async function DELETE(req: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
+  const { error, user } = await requireApproved();
+  if (error || !user) return error;
   try {
     const { id } = await req.json();
     if (!id) return NextResponse.json({ ok: false, error: "id required" }, { status: 400 });

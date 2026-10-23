@@ -5,11 +5,20 @@ import { getCurrentUser } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+// تأمين مشترك: يجب أن يكون مُوافَق عليه
+async function requireApproved() {
+  const user = await getCurrentUser();
+  if (!user) return { error: NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 }), user: null };
+  if (user.role !== "admin" && user.status !== "approved") {
+    return { error: NextResponse.json({ ok: false, error: "Account pending approval", needsApproval: true }, { status: 403 }), user: null };
+  }
+  return { error: null, user };
+}
+
 // GET — list user's telegram accounts
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
-
+  const { error, user } = await requireApproved();
+  if (error || !user) return error;
   await ensureSchema();
   const rows = await sql`
     SELECT id, phone, full_name, username, status, created_at
@@ -21,9 +30,8 @@ export async function GET() {
 
 // POST — add a telegram account (login flow: send code → verify)
 export async function POST(req: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
-
+  const { error, user } = await requireApproved();
+  if (error || !user) return error;
   try {
     const { action, phone, code, sessionString, phoneCodeHash, password, apiId, apiHash, session, name } = await req.json();
     await ensureSchema();
@@ -39,7 +47,6 @@ export async function POST(req: NextRequest) {
     if (action === "verify_code") {
       const result = await verifyCode(phone, code, sessionString, phoneCodeHash, apiId ? Number(apiId) : undefined, apiHash);
       if (result.ok && result.sessionString) {
-        // Save to DB
         const id = `tg_${Date.now()}_${Math.random().toString(36).substring(7)}`;
         await sql`
           INSERT INTO telegram_accounts (id, owner_id, phone, session_string, api_id, api_hash, full_name, username, status)
@@ -89,9 +96,8 @@ export async function POST(req: NextRequest) {
 
 // DELETE — remove account
 export async function DELETE(req: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
-
+  const { error, user } = await requireApproved();
+  if (error || !user) return error;
   const { id } = await req.json();
   await sql`DELETE FROM telegram_accounts WHERE id = ${id} AND owner_id = ${user.id}`;
   return NextResponse.json({ ok: true });

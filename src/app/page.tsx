@@ -30,6 +30,9 @@ export default function Home() {
     fetch("/api/auth/me").then(r => r.json()).then(d => {
       if (!d.ok) { router.push("/login"); return; }
       setUser(d.user);
+      // التحقق من حالة الموافقة (الأدمن يتخطّى)
+      if (d.user.role !== "admin" && d.user.status === "pending") { router.push("/pending"); return; }
+      if (d.user.role !== "admin" && d.user.status === "rejected") { router.push("/pending"); return; }
       setLoading(false);
       loadAccounts();
     }).catch(() => router.push("/login"));

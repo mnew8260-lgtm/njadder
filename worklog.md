@@ -94,3 +94,82 @@ Stage Summary:
   · src/app/accounts/page.tsx (إضافة 🚫 في bottom nav)
   · src/app/api/execute/route.ts (فلترتا blacklist في adders + contactadder)
 - الثيم الذهبي محفوظ، التصميم طبقي، responsive بالكامل
+
+---
+Task ID: 3
+Agent: main (Z.ai)
+Task: إضافة نظام موافقة المطور (Developer Approval System) — لا يمكن لأي مستخدم دخول التطبيق إلا بعد موافقة الأدمن
+
+Work Log:
+- أضفت عمود status في جدول users (default 'pending'):
+  · 'pending' = بانتظار موافقة المطور
+  · 'approved' = مُوافَق عليه
+  · 'rejected' = مرفوض
+- عدّلت src/lib/auth.ts:
+  · getCurrentUser يرجع status مع user object
+  · أضفت requireApproved() helper — للأدمن يتخطّى، لغير المُوافَق عليه يرجع null
+- عدّلت /api/auth/register:
+  · أول مستخدم = admin + status='approved' (يدخل فوراً)
+  · باقي المستخدمين = status='pending' + يرجع needsApproval:true
+- عدّلت /api/auth/login:
+  · يمنع الدخول لو status='pending' (403 + needsApproval:true)
+  · يمنع الدخول لو status='rejected' (403 + rejected:true)
+  · أضفت DELETE method لتنظيف cookie عند logout
+- عدّلت /api/admin/users (GET + POST):
+  · GET يرجع users + stats (total/pending/approved/rejected)
+  · POST يدعم 5 actions: set_plan / approve / reject / pending / delete
+  · delete يمنع حذف الأدمن وحذف النفس + ينظّف telegram_accounts + blacklist + usage_log
+- أعدت كتابة /admin page بالكامل:
+  · 4 إحصائيات أعلى (total/pending/approved/rejected) — قابلة للنقر كتبويبات
+  · 4 تبويبات: ⏳ بانتظار / ✓ موافق / 🚫 مرفوض / 📋 الكل
+  · كل مستخدم له: ✓ موافقة / 🚫 رفض / ⏳ إعادة للانتظار / 🗑 حذف / select لخطة
+  · badges ملوّنة للحالة (amber/green/red)
+- أنشأت /pending page:
+  · تعرض ⏳ "بانتظار الموافقة" للمعلّق
+  · تعرض 🚫 "تم رفض حسابك" للمرفوض
+  · زر "🔄 التحقق من الحالة" — لو تمت الموافقة يحوّل للرئيسية
+  · زر "🚪 تسجيل الخروج"
+- عدّلت /register page:
+  · تنبيه أصفر: "⚠️ عند التسجيل، سيحتاج حسابك لموافقة المطور"
+  · بعد النجاح: لو needsApproval → /pending، لو أدمن → /
+- أضفت فحص status='approved' في كل الصفحات المحمية:
+  · / (page.tsx) — لو pending/rejected → /pending
+  · /accounts — نفس الفحص
+  · /blacklist — نفس الفحص
+  · /subscription — نفس الفحص
+- أضفت تأمين server-side في كل APIs الحساسة:
+  · /api/accounts (GET/POST/DELETE) — requireApproved()
+  · /api/blacklist (GET/POST/DELETE) — requireApproved()
+  · /api/execute (POST) — يفحص status قبل أي تنفيذ
+- أصلحت خطأ JSX fragment (</>) في pending/page.tsx بتحويله إلى ternary + <span>
+- البناء نجح بالكامل (10 صفحات بعد إضافة /pending، 6 APIs)
+- أعدت تشغيل الخادم: كل الصفحات (/login, /register, /pending, /admin, /blacklist) → HTTP 200
+
+Stage Summary:
+- ✅ نظام الموافقة يعمل بالكامل:
+  Flow:
+    1. مستخدم يسجّل → status='pending' → redirect إلى /pending
+    2. يرى رسالة "بانتظار موافقة المطور" + زر تحقق
+    3. الأدمن يدخل /admin → يرى المستخدم في تبويب "⏳ بانتظار"
+    4. يضغط "✓ موافقة" → status='approved'
+    5. المستخدم يضغط "🔄 التحقق" → يدخل للتطبيق
+    6. لو الأدمن ضغط "🚫 رفض" → المستخدم يرى صفحة الرفض
+    7. لو الأدمن ضغط "🗑 حذف" → يُحذف المستخدم + كل بياناته
+- الأدمن (أول مستخدم) لا يحتاج موافقة أبداً
+- تأمين مزدوج (client + server): حتى لو حاول مستخدم pending الوصول لـ /api/execute مباشرة، يُرفض بـ 403
+- الملفات المعدّلة/الجديدة:
+  · src/lib/db.ts (status column + getAllUsers يرجع status)
+  · src/lib/auth.ts (status في getCurrentUser + requireApproved)
+  · src/app/api/auth/register/route.ts (status='pending' + needsApproval)
+  · src/app/api/auth/login/route.ts (فحص status + DELETE method)
+  · src/app/api/admin/users/route.ts (5 actions + stats)
+  · src/app/api/accounts/route.ts (requireApproved)
+  · src/app/api/blacklist/route.ts (requireApproved)
+  · src/app/api/execute/route.ts (فحص status)
+  · src/app/admin/page.tsx (إعادة كتابة كاملة + تبويبات + إحصائيات)
+  · src/app/pending/page.tsx (ملف جديد)
+  · src/app/register/page.tsx (تنبيه + redirect ذكي)
+  · src/app/page.tsx (فحص status)
+  · src/app/accounts/page.tsx (فحص status)
+  · src/app/blacklist/page.tsx (فحص status)
+  · src/app/subscription/page.tsx (فحص status)

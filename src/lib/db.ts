@@ -84,6 +84,9 @@ export async function ensureSchema() {
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_plan TEXT DEFAULT 'free'`;
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_expires BIGINT DEFAULT 0`;
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_used BOOLEAN DEFAULT FALSE`;
+  // ─── Approval system column ───
+  // status: 'pending' (بانتظار موافقة المطور), 'approved' (مقبول), 'rejected' (مرفوض)
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'`;
   await sql`
     CREATE TABLE IF NOT EXISTS usage_log (
       id SERIAL PRIMARY KEY,
@@ -194,7 +197,7 @@ export const SubscriptionService = {
   async getAllUsers(): Promise<any[]> {
     await ensureSchema();
     return await sql`
-      SELECT id, username, role, subscription_plan, subscription_expires, created_at
+      SELECT id, username, role, status, subscription_plan, subscription_expires, created_at
       FROM users ORDER BY created_at DESC
     ` as any[];
   },

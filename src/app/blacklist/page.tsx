@@ -29,6 +29,10 @@ export default function BlacklistPage() {
   useEffect(() => {
     fetch("/api/auth/me").then(r => r.json()).then(d => {
       if (!d.ok) { router.push("/login"); return; }
+      // التحقق من حالة الموافقة
+      if (d.user.role !== "admin" && (d.user.status === "pending" || d.user.status === "rejected")) {
+        router.push("/pending"); return;
+      }
       setUser(d.user); setLoading(false); load();
     });
   }, []);

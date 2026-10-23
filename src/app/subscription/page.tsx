@@ -9,14 +9,22 @@ export default function SubscriptionPage() {
   const router = useRouter();
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/subscription").then(r => r.json()),
-      fetch("/api/subscription/plans").then(r => r.json()),
-    ]).then(([sub, plansData]) => {
-      if (!sub.ok) { router.push("/login"); return; }
-      setData(sub);
-      setPlans(plansData.plans || []);
-      setLoading(false);
+    // أولاً نتحقق من حالة المستخدم
+    fetch("/api/auth/me").then(r => r.json()).then(d => {
+      if (!d.ok) { router.push("/login"); return; }
+      if (d.user.role !== "admin" && (d.user.status === "pending" || d.user.status === "rejected")) {
+        router.push("/pending"); return;
+      }
+      // ثم نحمّل بيانات الاشتراك
+      Promise.all([
+        fetch("/api/subscription").then(r => r.json()),
+        fetch("/api/subscription/plans").then(r => r.json()),
+      ]).then(([sub, plansData]) => {
+        if (!sub.ok) { router.push("/login"); return; }
+        setData(sub);
+        setPlans(plansData.plans || []);
+        setLoading(false);
+      });
     });
   }, []);
 

@@ -20,7 +20,12 @@ export default function RegisterPage() {
         body: JSON.stringify({ username, password }),
       });
       const data = await res.json();
-      if (data.ok) router.push("/");
+      if (data.ok) {
+        // لو المستخدم بانتظار الموافقة → صفحة /pending
+        // لو أدمن (أول مستخدم) → الرئيسية مباشرة
+        if (data.needsApproval) router.push("/pending");
+        else router.push("/");
+      }
       else setError(data.error || "فشل");
     } catch (e: any) { setError(e.message); }
     setLoading(false);
@@ -56,6 +61,9 @@ export default function RegisterPage() {
             />
           </div>
           {error && <p className="text-sm text-red-400 text-center">{error}</p>}
+          <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-3 text-xs text-amber-300/80 leading-relaxed">
+            ⚠️ ملاحظة: عند التسجيل، سيحتاج حسابك لموافقة المطور قبل أن تتمكن من استخدام الأداة.
+          </div>
           <button
             onClick={register}
             disabled={loading}

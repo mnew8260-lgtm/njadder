@@ -11,6 +11,10 @@ export const maxDuration = 300;
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
+  // تأمين الموافقة
+  if (user.role !== "admin" && user.status !== "approved") {
+    return NextResponse.json({ ok: false, error: "حسابك بانتظار موافقة المطور", needsApproval: true }, { status: 403 });
+  }
 
   try {
     const { accountId, commandKey, params } = await req.json();
