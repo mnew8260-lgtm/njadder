@@ -1,0 +1,46 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "next build",
+  "installCommand": "npm install",
+  "outputDirectory": ".next",
+  "regions": ["iad1"],
+  "functions": {
+    "src/app/api/commands/execute/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "src/app/api/commands/execute-multi/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "src/app/api/scrape/execute/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "src/app/api/add-members/execute/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "src/app/api/multi-account/execute/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "src/app/api/telegram/send-code/route.ts": {
+      "maxDuration": 30,
+      "memory": 512
+    },
+    "src/app/api/telegram/verify-code/route.ts": {
+      "maxDuration": 30,
+      "memory": 512
+    },
+    "src/app/api/telegram/verify-password/route.ts": {
+      "maxDuration": 30,
+      "memory": 512
+    },
+    "src/app/api/telegram/bulk-send-code/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  }
+}
