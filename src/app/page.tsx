@@ -58,17 +58,30 @@ export default function Home() {
     : [];
 
   async function executeCommand() {
-    if (!selectedCommand || !selectedAccount) return;
+    if (!selectedCommand) return;
+    // أوامر تسجيل الدخول (category=login) لا تحتاج حساب موجود
+    // لأنها تُنشئ حساباً جديداً (send_code / loginbycsv / etc.)
+    const isLoginCmd = selectedCommand.category === "login";
+    if (!isLoginCmd && !selectedAccount) {
+      setOutput("❌ اختر حساباً أولاً");
+      return;
+    }
     setExecuting(true);
     setOutput("⏳ جاري التنفيذ...");
     try {
       const res = await fetch("/api/execute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accountId: selectedAccount, commandKey: selectedCommand.key, params: formValues }),
+        body: JSON.stringify({
+          accountId: isLoginCmd ? undefined : selectedAccount,
+          commandKey: selectedCommand.key,
+          params: formValues,
+        }),
       });
       const data = await res.json();
       setOutput(data.output || data.error || "تم");
+      // لو كان أمر login، أعد تحميل الحسابات (لأنه قد يكون أضاف حسابات جديدة)
+      if (isLoginCmd && data.ok) loadAccounts();
     } catch (e: any) { setOutput("❌ " + e.message); }
     setExecuting(false);
   }
@@ -324,18 +337,27 @@ export default function Home() {
             ) : (
               <>
                 {/* ─── Normal command execution ─── */}
-                {/* Account */}
-                <div className="bg-[#141414] border border-[#1a1a1a] rounded-2xl p-4 mb-4">
-                  <label className="block text-sm text-neutral-400 mb-2">📱 الحساب</label>
-                  {accounts.length === 0 ? (
-                    <a href="/accounts" className="text-sm text-amber-500 hover:underline">لا يوجد حسابات — أضف حساباً ←</a>
-                  ) : (
-                    <select value={selectedAccount} onChange={e => setSelectedAccount(e.target.value)}
-                      className="w-full bg-[#0a0a0a] text-white rounded-lg px-3 py-2.5 border border-[#222] focus:border-amber-500/30 focus:outline-none">
-                      {accounts.map(a => <option key={a.id} value={a.id}>{a.full_name || a.phone}</option>)}
-                    </select>
-                  )}
-                </div>
+                {/* Account — مخفي لأوامر تسجيل الدخول لأنها لا تحتاج حساب */}
+                {selectedCommand.category !== "login" && (
+                  <div className="bg-[#141414] border border-[#1a1a1a] rounded-2xl p-4 mb-4">
+                    <label className="block text-sm text-neutral-400 mb-2">📱 الحساب</label>
+                    {accounts.length === 0 ? (
+                      <a href="/accounts" className="text-sm text-amber-500 hover:underline">لا يوجد حسابات — أضف حساباً ←</a>
+                    ) : (
+                      <select value={selectedAccount} onChange={e => setSelectedAccount(e.target.value)}
+                        className="w-full bg-[#0a0a0a] text-white rounded-lg px-3 py-2.5 border border-[#222] focus:border-amber-500/30 focus:outline-none">
+                        {accounts.map(a => <option key={a.id} value={a.id}>{a.full_name || a.phone}</option>)}
+                      </select>
+                    )}
+                  </div>
+                )}
+
+                {/* تنبيه لأوامر تسجيل الدخول: لا حاجة لحساب */}
+                {selectedCommand.category === "login" && (
+                  <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-3 mb-4 text-xs text-amber-300/80 leading-relaxed">
+                    💡 هذا الأمر يُنشئ حساباً جديداً — لا حاجة لاختيار حساب موجود. املأ الحقول بالأسفل واضغط تنفيذ.
+                  </div>
+                )}
 
                 {/* Fields */}
                 {selectedCommand.fields.length > 0 && (
@@ -375,7 +397,9 @@ export default function Home() {
                   </div>
                 )}
 
-                <button onClick={executeCommand} disabled={executing || !selectedAccount}
+                <button
+                  onClick={executeCommand}
+                  disabled={executing || (selectedCommand.category !== "login" && !selectedAccount)}
                   className="w-full bg-amber-500 text-black font-bold rounded-xl py-3 hover:bg-amber-400 transition-colors disabled:opacity-50 active:scale-[0.98] mb-4">
                   {executing ? "⏳ جاري التنفيذ..." : "⚡ تنفيذ الأمر"}
                 </button>

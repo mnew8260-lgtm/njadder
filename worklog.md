@@ -202,3 +202,45 @@ Stage Summary:
 - الملف المعدّل: src/lib/telegram.ts (سطر واحد للتغيير + تعليق توضيحي)
 - لا حاجة لتعديل next.config.mjs (serverExternalPackages سيبقى على telegram لأنه مفيد للأداء)
 - النشر على VPS: git pull && pm2 restart njadder
+
+---
+Task ID: 5
+Agent: main (Z.ai)
+Task: إصلاح مشكلة "ما يعمل" عند تنفيذ أوامر تسجيل الدخول (loginbycsv وغيرها) بدون حساب موجود
+
+Work Log:
+- شخّصت المشكلة من لقطة الشاشة:
+  · المستخدم اختار "تسجيل دخول بملف CSV" (cmd.key=loginbycsv)
+  · أدخل 14 رقم هاتف + التأخير=10
+  · لكنه لا يملك أي حساب تيليجرام مُضاف
+  · النتيجة: زر "تنفيذ الأمر" معطّل (disabled) لأنه يتطلب selectedAccount
+- السبب الجذري: تصميم الـ API خاطئ لأوامر تسجيل الدخول
+  · /api/execute يطلب accountId دائماً (line 21)
+  · /api/execute يبني عميل من session الحساب الموجود (line 27-37)
+  · لكن أوامر login (category=login) تُنشئ حسابات جديدة — لا تحتاج session موجود!
+- الإصلاح في /api/execute/route.ts:
+  · نقل فحص getCommandByKey ABOVE فحص accountId
+  · إذا cmd.category === "login":
+    - لا نطلب accountId
+    - نمرر null client إلى executeCommand
+    - executeCommand يستخدم sendCode() الداخلية التي تنشئ عملاء جدد
+  · باقي الأوامر: تبقى متطلبة accountId كما هي
+- الإصلاح في src/app/page.tsx:
+  · executeCommand() يفحص isLoginCmd = selectedCommand.category === "login"
+  · لو login: لا يطلب selectedAccount + يرسل accountId=undefined
+  · لو login ونجح: يُعيد تحميل الحسابات (loadAccounts) لإظهار الجديدة
+  · أخفيت بطاقة "📱 الحساب" لأوامر login في الواجهة
+  · أضفت تنبيه أصفر: "💡 هذا الأمر يُنشئ حساباً جديداً — لا حاجة لاختيار حساب موجود"
+  · زر "⚡ تنفيذ الأمر" يصبح enabled لأوامر login حتى بدون حساب
+- البناء نجح بالكامل، الخادم يعمل /: HTTP 200
+
+Stage Summary:
+- ✅ الآن يمكن للمستخدم:
+  1. اختيار "تسجيل دخول بملف CSV" (أو أي أمر في فئة "الحسابات وتسجيل الدخول")
+  2. إدخال قائمة الأرقام + التأخير
+  3. الضغط على "تنفيذ الأمر" — سيعمل فوراً!
+  4. سيُرسل كود تيليجرام لكل رقم ويُنشئ حسابات pending_code في DB
+  5. ستظهر الحسابات الجديدة تلقائياً في القائمة بعد التنفيذ
+- الملفات المعدّلة:
+  · src/app/api/execute/route.ts (إعادة ترتيب الفحوص + استثناء login)
+  · src/app/page.tsx (إخفاء الحساب لأوامر login + تنبيه + تفعيل الزر)

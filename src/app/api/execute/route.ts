@@ -18,18 +18,35 @@ export async function POST(req: NextRequest) {
 
   try {
     const { accountId, commandKey, params } = await req.json();
-    if (!accountId || !commandKey) {
-      return NextResponse.json({ ok: false, error: "accountId and commandKey required" }, { status: 400 });
+    if (!commandKey) {
+      return NextResponse.json({ ok: false, error: "commandKey required" }, { status: 400 });
     }
 
     await ensureSchema();
 
+    const cmd = getCommandByKey(commandKey);
+    if (!cmd) return NextResponse.json({ ok: false, error: "Command not found" }, { status: 404 });
+
+    // ─── أوامر تسجيل الدخول (1-22) لا تحتاج حساب موجود ───
+    // لأنها تُنشئ حساباً جديداً (send_code / loginbycsv / etc.)
+    if (cmd.category === "login") {
+      // نمرر null للعميل لأن executeCommand سيُنشئ عملاء جدد لكل عملية login
+      try {
+        const result = await executeCommand(null, cmd, params || {}, user.id, "", "");
+        return NextResponse.json(result);
+      } catch (e: any) {
+        return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+      }
+    }
+
+    // ─── باقي الأوامر تتطلب حساباً موجوداً ───
+    if (!accountId) {
+      return NextResponse.json({ ok: false, error: "accountId required for this command" }, { status: 400 });
+    }
+
     const rows = await sql`SELECT * FROM telegram_accounts WHERE id = ${accountId} AND owner_id = ${user.id}`;
     const account = (rows as any[])[0];
     if (!account) return NextResponse.json({ ok: false, error: "Account not found" }, { status: 404 });
-
-    const cmd = getCommandByKey(commandKey);
-    if (!cmd) return NextResponse.json({ ok: false, error: "Command not found" }, { status: 404 });
 
     const client = buildClient(account.session_string || "", {
       apiId: account.api_id ? Number(account.api_id) : undefined,
