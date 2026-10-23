@@ -161,6 +161,7 @@ export default function Home() {
           />
           <div className="flex items-center gap-2 shrink-0">
             <a href="/accounts" className="text-sm text-neutral-400 hover:text-amber-500">📱</a>
+            <a href="/blacklist" className="text-sm text-neutral-400 hover:text-amber-500">🚫</a>
             <a href="/subscription" className="text-sm text-neutral-400 hover:text-amber-500">💳</a>
             {user?.role === "admin" && <a href="/admin" className="text-sm text-neutral-400 hover:text-amber-500">⚙️</a>}
             <button onClick={logout} className="text-sm text-neutral-500 hover:text-red-400">🚪</button>
@@ -391,12 +392,13 @@ export default function Home() {
       {/* Mobile bottom nav */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0a0a0a]/95 backdrop-blur-md border-t border-[#1a1a1a] safe-bottom">
         <div className="flex items-center justify-around py-2">
-          <button onClick={() => { setExpandedCat(null); setSearchQuery(""); setSelectedCommand(null); setOutput(""); }} className="flex flex-col items-center gap-0.5 px-3 py-1">
+          <button onClick={() => { setExpandedCat(null); setSearchQuery(""); setSelectedCommand(null); setOutput(""); }} className="flex flex-col items-center gap-0.5 px-2 py-1">
             <span className="text-lg">🏠</span><span className="text-[10px] text-neutral-400">الرئيسية</span>
           </button>
-          <a href="/accounts" className="flex flex-col items-center gap-0.5 px-3 py-1"><span className="text-lg">📱</span><span className="text-[10px] text-neutral-400">حسابات</span></a>
-          <a href="/subscription" className="flex flex-col items-center gap-0.5 px-3 py-1"><span className="text-lg">💳</span><span className="text-[10px] text-neutral-400">اشتراك</span></a>
-          <button onClick={logout} className="flex flex-col items-center gap-0.5 px-3 py-1"><span className="text-lg">🚪</span><span className="text-[10px] text-neutral-400">خروج</span></button>
+          <a href="/accounts" className="flex flex-col items-center gap-0.5 px-2 py-1"><span className="text-lg">📱</span><span className="text-[10px] text-neutral-400">حسابات</span></a>
+          <a href="/blacklist" className="flex flex-col items-center gap-0.5 px-2 py-1"><span className="text-lg">🚫</span><span className="text-[10px] text-neutral-400">سوداء</span></a>
+          <a href="/subscription" className="flex flex-col items-center gap-0.5 px-2 py-1"><span className="text-lg">💳</span><span className="text-[10px] text-neutral-400">اشتراك</span></a>
+          <button onClick={logout} className="flex flex-col items-center gap-0.5 px-2 py-1"><span className="text-lg">🚪</span><span className="text-[10px] text-neutral-400">خروج</span></button>
         </div>
       </div>
     </div>

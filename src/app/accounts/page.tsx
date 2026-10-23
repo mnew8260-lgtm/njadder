@@ -402,10 +402,11 @@ export default function AccountsPage() {
 
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0f0f0f] border-t border-[#262626] safe-bottom">
         <div className="flex items-center justify-around py-2">
-          <a href="/" className="flex flex-col items-center gap-0.5 px-3 py-1"><span className="text-lg">🏠</span><span className="text-[10px] text-neutral-400">الرئيسية</span></a>
-          <div className="flex flex-col items-center gap-0.5 px-3 py-1"><span className="text-lg text-amber-500">📱</span><span className="text-[10px] text-amber-500">حسابات</span></div>
-          <a href="/subscription" className="flex flex-col items-center gap-0.5 px-3 py-1"><span className="text-lg">💳</span><span className="text-[10px] text-neutral-400">اشتراك</span></a>
-          <a href="/" className="flex flex-col items-center gap-0.5 px-3 py-1"><span className="text-lg">🚪</span><span className="text-[10px] text-neutral-400">خروج</span></a>
+          <a href="/" className="flex flex-col items-center gap-0.5 px-2 py-1"><span className="text-lg">🏠</span><span className="text-[10px] text-neutral-400">الرئيسية</span></a>
+          <div className="flex flex-col items-center gap-0.5 px-2 py-1"><span className="text-lg text-amber-500">📱</span><span className="text-[10px] text-amber-500">حسابات</span></div>
+          <a href="/blacklist" className="flex flex-col items-center gap-0.5 px-2 py-1"><span className="text-lg">🚫</span><span className="text-[10px] text-neutral-400">سوداء</span></a>
+          <a href="/subscription" className="flex flex-col items-center gap-0.5 px-2 py-1"><span className="text-lg">💳</span><span className="text-[10px] text-neutral-400">اشتراك</span></a>
+          <a href="/" className="flex flex-col items-center gap-0.5 px-2 py-1"><span className="text-lg">🚪</span><span className="text-[10px] text-neutral-400">خروج</span></a>
         </div>
       </div>
     </div>

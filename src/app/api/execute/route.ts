@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql, ensureSchema } from "@/lib/db";
+import { sql, ensureSchema, BlacklistService } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { buildClient, scrapeGroupMembers, addSingleMember, smartDelay } from "@/lib/telegram";
 import { getCommandByKey, Command } from "@/lib/commands";
@@ -271,6 +271,10 @@ async function executeCommand(
       const delay = Number(params.delay || 3);
       if (!target) return { ok: false, output: "رابط المجموعة الهدف مطلوب" };
 
+      // 🚫 تحميل القائمة السوداء لمستخدم
+      const blacklistSet = await BlacklistService.idSet(userId);
+      let blacklistedSkipped = 0;
+
       let users: any[] = [];
       if (source) {
         addLog(`📥 سحب من المصدر: ${source}`);
@@ -285,6 +289,14 @@ async function executeCommand(
       }
       if (!users.length) return { ok: false, output: "لا يوجد أعضاء" };
 
+      // 🚫 فلترة القائمة السوداء
+      if (blacklistSet.size > 0) {
+        const before = users.length;
+        users = users.filter(u => !blacklistSet.has(String(u.id)));
+        blacklistedSkipped = before - users.length;
+        if (blacklistedSkipped > 0) addLog(`🚫 تم تخطّي ${blacklistedSkipped} معرّف من القائمة السوداء`);
+      }
+
       addLog(`➕ إضافة ${users.length} إلى: ${target}`);
       let added = 0, skipped = 0;
       for (const u of users) {
@@ -294,7 +306,7 @@ async function executeCommand(
         else { skipped++; }
         await smartDelay(delay);
       }
-      addLog(`\n📊 ✓ ${added} أُضيف | ⊘ ${skipped} تخطّي`);
+      addLog(`\n📊 ✓ ${added} أُضيف | ⊘ ${skipped} تخطّي${blacklistedSkipped ? ` | 🚫 ${blacklistedSkipped} محظور` : ""}`);
       return { ok: true, output: log.join("\n") };
     }
 
@@ -305,13 +317,22 @@ async function executeCommand(
       if (cmd.key === "contactadder") {
         const usersList = params.userList || "";
         if (!usersList) return { ok: false, output: "قائمة المستخدمين مطلوبة" };
-        const users = usersList.split("\n").map((l: string) => { const p = l.split("|"); return { id: p[0], first_name: p[2] || "User" }; }).filter((u: any) => u.id);
+        // 🚫 فلترة القائمة السوداء
+        const blacklistSet = await BlacklistService.idSet(userId);
+        let blacklistedSkipped = 0;
+        let users = usersList.split("\n").map((l: string) => { const p = l.split("|"); return { id: p[0], first_name: p[2] || "User" }; }).filter((u: any) => u.id);
+        if (blacklistSet.size > 0) {
+          const before = users.length;
+          users = users.filter(u => !blacklistSet.has(String(u.id)));
+          blacklistedSkipped = before - users.length;
+          if (blacklistedSkipped > 0) addLog(`🚫 تم تخطّي ${blacklistedSkipped} من القائمة السوداء`);
+        }
         let added = 0;
         for (const u of users) {
           try { await client.addContact(u.id, u.first_name); added++; addLog(`✓ ${u.first_name}`); } catch (e: any) { addLog(`✗ ${u.id}`); }
           await smartDelay(2);
         }
-        return { ok: true, output: `✓ تمت إضافة ${added}/${users.length} جهة اتصال\n` + log.join("\n") };
+        return { ok: true, output: `✓ تمت إضافة ${added}/${users.length} جهة اتصال${blacklistedSkipped ? ` (🚫 تخطّي ${blacklistedSkipped} محظور)` : ""}\n` + log.join("\n") };
       }
       if (cmd.key === "contactdeleter") {
         try {
