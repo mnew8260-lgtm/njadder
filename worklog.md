@@ -173,3 +173,32 @@ Stage Summary:
   · src/app/accounts/page.tsx (فحص status)
   · src/app/blacklist/page.tsx (فحص status)
   · src/app/subscription/page.tsx (فحص status)
+
+---
+Task ID: 4
+Agent: main (Z.ai)
+Task: إصلاح خطأ "Only StringSession and StoreSessions are supported currently :(" عند تسجيل دخول تيليجرام جديد
+
+Work Log:
+- شخّصت الخطأ من لقطة الشاشة: المستخدم ضغط "إرسال الكود" برقم 966541968661
+  وظهر: ❌ Only StringSession and StoreSessions are supported currently :(
+- هذا خطأ معروف في GramJS يحدث عندما:
+  · StringSession يُستورد من مسار فرعي "telegram/sessions"
+  · بينما TelegramClient يُستورد من المسار الرئيسي "telegram"
+  · بسبب serverExternalPackages=["telegram"] في next.config.mjs
+  · Next.js يحمّل نسختين منفصلتين من GramJS
+  · instanceof StringSession يفشل داخل GramJS رغم أن النوع صحيح
+- الإصلاح في src/lib/telegram.ts:
+  · قبل: import { StringSession } from "telegram/sessions"
+  · بعد: import { TelegramClient, Api, sessions } from "telegram"
+         const { StringSession } = sessions
+  · بهذا يُستخرج StringSession من نفس الـ module instance
+  · instanceof StringSession سيعمل بشكل صحيح
+- البناء نجح والتحذير "Package telegram can't be external" اختفى من المخرجات
+- الخادم يعمل: /login → HTTP 200
+
+Stage Summary:
+- ✅ إصلاح جذري لمشكلة تسجيل دخول تيليجرام
+- الملف المعدّل: src/lib/telegram.ts (سطر واحد للتغيير + تعليق توضيحي)
+- لا حاجة لتعديل next.config.mjs (serverExternalPackages سيبقى على telegram لأنه مفيد للأداء)
+- النشر على VPS: git pull && pm2 restart njadder
