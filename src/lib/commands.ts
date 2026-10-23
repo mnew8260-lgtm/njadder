@@ -187,9 +187,9 @@ export const COMMANDS: Command[] = [
     "description": "تسجيل دخول جماعي لأرقام متعددة من ملف phone.csv.",
     "fields": [
       {
-        "name": "csvPath",
-        "label": "مسار CSV",
-        "type": "file",
+        "name": "phonesList",
+        "label": "قائمة الأرقام (رقم في كل سطر)",
+        "type": "textarea",
         "placeholder": "phone.csv",
         "required": true
       },
@@ -227,16 +227,16 @@ export const COMMANDS: Command[] = [
     "description": "تسجيل دخول جماعي مع ملف API متعدد لكل حساب.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الأرقام",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
       {
         "name": "apiCsvPath",
         "label": "ملف APIs",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -348,7 +348,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "imagePath",
         "label": "مسار الصورة",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "photo.jpg",
         "required": true
       }
@@ -435,9 +435,9 @@ export const COMMANDS: Command[] = [
     "description": "تنظيف ملف CSV من الأسطر الفارغة والزائدة.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "مسار الملف",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -455,9 +455,9 @@ export const COMMANDS: Command[] = [
     "description": "فحص وفصل الحسابات المحظورة في ملف phone.csv.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "مسار ملف الأرقام",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -475,9 +475,9 @@ export const COMMANDS: Command[] = [
     "description": "إزالة حسابات معينة من قائمة phone.csv.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "مسار الملف",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -663,7 +663,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "inputFile",
         "label": "ملف الأعضاء",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -683,7 +683,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "inputFile",
         "label": "ملف الأعضاء",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -703,7 +703,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "inputFile",
         "label": "ملف الأعضاء",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -723,7 +723,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "inputFile",
         "label": "ملف الأعضاء",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -743,7 +743,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "inputFile",
         "label": "ملف الأعضاء",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -763,7 +763,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "inputFile",
         "label": "ملف الأعضاء",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -783,7 +783,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "inputFile",
         "label": "ملف الأعضاء",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -803,7 +803,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "inputFile",
         "label": "ملف الأعضاء",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -823,7 +823,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "inputFile",
         "label": "ملف الأعضاء",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -843,7 +843,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "inputFile",
         "label": "ملف الأعضاء",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -863,7 +863,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "inputFile",
         "label": "ملف الأعضاء",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -890,7 +890,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "inputFile",
         "label": "ملف الأعضاء",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -949,7 +949,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "inputFile",
         "label": "ملف الأعضاء",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -969,7 +969,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "inputFile",
         "label": "ملف الأعضاء",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -1011,9 +1011,9 @@ export const COMMANDS: Command[] = [
     "description": "إضافة متقدمة بنظام Ramex (دورات متعددة بحسابات متعددة).",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -1043,9 +1043,9 @@ export const COMMANDS: Command[] = [
     "description": "إضافة Ramex مع فلتر النشاط اليومي.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -1063,9 +1063,9 @@ export const COMMANDS: Command[] = [
     "description": "إضافة Ramex مع فلتر النشاط الأسبوعي.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -1083,9 +1083,9 @@ export const COMMANDS: Command[] = [
     "description": "إضافة Ramex مع فلتر النشاط الشهري.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -1103,9 +1103,9 @@ export const COMMANDS: Command[] = [
     "description": "إضافة Ramex للأعضاء المتصلين حاليًا.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -1123,9 +1123,9 @@ export const COMMANDS: Command[] = [
     "description": "إضافة Ramex للأعضاء غير النشطين.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -1167,16 +1167,16 @@ export const COMMANDS: Command[] = [
     "description": "إضافة جماعية متعددة الحسابات لمجموعة واحدة.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
       {
         "name": "inputFile",
         "label": "ملف الأعضاء",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -1194,16 +1194,16 @@ export const COMMANDS: Command[] = [
     "description": "إضافة جماعية متعددة الخيوط (Threads) لسرعة أعلى.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
       {
         "name": "inputFile",
         "label": "ملف الأعضاء",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -1276,9 +1276,9 @@ export const COMMANDS: Command[] = [
     "description": "استيراد جهات اتصال متعددة من ملف CSV.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف جهات الاتصال",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -1308,9 +1308,9 @@ export const COMMANDS: Command[] = [
     "description": "إرسال رسالة إلى مجموعة عبر حسابات متعددة بالتناوب.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -1351,9 +1351,9 @@ export const COMMANDS: Command[] = [
     "description": "إرسال رسالة + صورة إلى مجموعة بعدة حسابات.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -1367,7 +1367,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "imagePath",
         "label": "مسار الصورة",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "pic.jpg",
         "required": true
       },
@@ -1410,7 +1410,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "imagePath",
         "label": "مسار الصورة",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -1661,7 +1661,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "imagePath",
         "label": "مسار الصورة",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -1815,9 +1815,9 @@ export const COMMANDS: Command[] = [
         "required": true
       },
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الأرقام",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -1844,14 +1844,14 @@ export const COMMANDS: Command[] = [
       {
         "name": "imagePath",
         "label": "مسار الصورة",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الأرقام",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -1869,9 +1869,9 @@ export const COMMANDS: Command[] = [
     "description": "إرسال رسائل خاصة جماعية عبر عدة حسابات.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -1885,7 +1885,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "targetsCsvPath",
         "label": "ملف الأهداف",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -1903,9 +1903,9 @@ export const COMMANDS: Command[] = [
     "description": "إرسال جماعي بنظام Ramex المتقدم.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -1919,7 +1919,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "targetsCsvPath",
         "label": "ملف الأهداف",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
@@ -1944,9 +1944,9 @@ export const COMMANDS: Command[] = [
         "required": true
       },
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الأهداف",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -2080,9 +2080,9 @@ export const COMMANDS: Command[] = [
     "description": "زيادة التفاعلات (Reactions) على رسالة محددة.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -2115,9 +2115,9 @@ export const COMMANDS: Command[] = [
     "description": "زيادة عدد مشاركات منشور عبر إعادة التوجيه.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -2150,9 +2150,9 @@ export const COMMANDS: Command[] = [
     "description": "زيادة عدد مشاهدات منشور في قناة.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -2185,9 +2185,9 @@ export const COMMANDS: Command[] = [
     "description": "إضافة تدريجية للمشاهدات على مدار فترة زمنية.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -2228,9 +2228,9 @@ export const COMMANDS: Command[] = [
     "description": "إرسال بلاغ 'حساب وهمي' على مستخدم محدد.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -2263,9 +2263,9 @@ export const COMMANDS: Command[] = [
     "description": "إرسال بلاغ 'سبام' على مستخدم.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -2298,9 +2298,9 @@ export const COMMANDS: Command[] = [
     "description": "بلاغ 'عنف' على مستخدم.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -2333,9 +2333,9 @@ export const COMMANDS: Command[] = [
     "description": "بلاغ 'إساءة للأطفال' - خطير جدا.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -2368,9 +2368,9 @@ export const COMMANDS: Command[] = [
     "description": "بلاغ 'حقوق نشر' على محتوى.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -2403,9 +2403,9 @@ export const COMMANDS: Command[] = [
     "description": "بلاغ 'محتوى غير ذي صلة بالموقع'.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -2438,9 +2438,9 @@ export const COMMANDS: Command[] = [
     "description": "بلاغ 'نشر تفاصيل شخصية'.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -2473,9 +2473,9 @@ export const COMMANDS: Command[] = [
     "description": "بلاغ 'مخدرات غير قانونية'.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -2508,9 +2508,9 @@ export const COMMANDS: Command[] = [
     "description": "بلاغ 'محتوى إباحي'.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -2543,9 +2543,9 @@ export const COMMANDS: Command[] = [
     "description": "بلاغ 'سبب آخر' مع شرح اختياري.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -2578,9 +2578,9 @@ export const COMMANDS: Command[] = [
     "description": "إرسال بلاغ 'احتيال'.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -2613,9 +2613,9 @@ export const COMMANDS: Command[] = [
     "description": "بلاغ 'مستخدم يرسل سبام' عبر @SpamBot.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -2648,9 +2648,9 @@ export const COMMANDS: Command[] = [
     "description": "قائمة شاملة لجميع أنواع البلاغات على تيليجرام.",
     "fields": [
       {
-        "name": "csvPath",
+        "name": "phonesList",
         "label": "ملف الحسابات",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       },
@@ -2748,7 +2748,7 @@ export const COMMANDS: Command[] = [
       {
         "name": "vcfPath",
         "label": "ملف VCF",
-        "type": "file",
+        "type": "textarea",
         "placeholder": "",
         "required": true
       }
