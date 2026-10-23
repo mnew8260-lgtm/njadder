@@ -163,8 +163,12 @@ export default function Home() {
           ))}
         </nav>
 
-        <div className="p-3 border-t border-[#262626] text-center">
-          <p className="text-[10px] text-neutral-600">@NMDDER_DEV</p>
+        <div className="p-3 border-t border-[#262626] space-y-2">
+          <a href="/subscription" className="block text-center text-xs text-amber-500 hover:text-amber-400">💳 الاشتراك</a>
+          {user?.role === "admin" && (
+            <a href="/admin" className="block text-center text-xs text-neutral-400 hover:text-white">⚙️ الأدمن</a>
+          )}
+          <p className="text-[10px] text-neutral-600 text-center">@NMDDER_DEV</p>
         </div>
       </aside>
 
