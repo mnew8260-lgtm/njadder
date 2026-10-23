@@ -16,6 +16,7 @@ export default function Home() {
   const [output, setOutput] = useState("");
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [showAccounts, setShowAccounts] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -79,9 +80,42 @@ export default function Home() {
   if (loading) return <div className="min-h-screen flex items-center justify-center text-neutral-500">⏳</div>;
 
   return (
-    <div className="min-h-screen flex">
-      {/* Sidebar */}
-      <aside className="w-64 bg-[#0f0f0f] border-l border-[#262626] flex flex-col fixed h-full overflow-y-auto">
+    <div className="min-h-screen">
+      {/* Mobile Top Bar */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#0f0f0f] border-b border-[#262626] safe-top">
+        <div className="flex items-center justify-between px-4 py-3">
+          <h1 className="text-xl font-black text-amber-500">NJADDER</h1>
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="text-white p-2 rounded-lg bg-[#1a1a1a]"
+          >
+            {mobileMenuOpen ? "✕" : "☰"}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Slide-out Menu */}
+      {mobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 z-40 bg-black/60" onClick={() => setMobileMenuOpen(false)}>
+          <div
+            className="absolute top-0 right-0 bottom-0 w-72 bg-[#0f0f0f] border-l border-[#262626] overflow-y-auto safe-top"
+            onClick={e => e.stopPropagation()}
+          >
+            <MobileMenu
+              user={user}
+              activeCategory={activeCategory}
+              searchQuery={searchQuery}
+              setActiveCategory={(c) => { setActiveCategory(c); setSearchQuery(""); setSelectedCommand(null); setOutput(""); setMobileMenuOpen(false); }}
+              setSearchQuery={(q) => { setSearchQuery(q); setActiveCategory(null); setMobileMenuOpen(false); }}
+              logout={logout}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="min-h-screen flex">
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex w-64 bg-[#0f0f0f] border-l border-[#262626] flex-col fixed h-full overflow-y-auto">
         <div className="p-5 border-b border-[#262626]">
           <h1 className="text-2xl font-black text-amber-500">NJADDER</h1>
           <p className="text-xs text-neutral-500 mt-1">PRO v7.0 — 118 أمر</p>
@@ -174,11 +208,11 @@ export default function Home() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 mr-64 p-6 overflow-y-auto">
+      <main className="flex-1 md:mr-64 pt-16 md:pt-0 p-4 md:p-6 overflow-y-auto pb-20 md:pb-6">
         {!selectedCommand ? (
           <>
             <header className="mb-6">
-              <h2 className="text-3xl font-black text-white">
+              <h2 className="text-2xl md:text-3xl font-black text-white">
                 {searchQuery ? `🔍 نتائج البحث (${filteredCommands.length})` : activeCategory ? CATEGORIES.find(c => c.key === activeCategory)?.nameAr : "🏆 لوحة التحكم"}
               </h2>
               <p className="text-sm text-neutral-500 mt-1">
@@ -188,7 +222,7 @@ export default function Home() {
 
             {/* Dashboard */}
             {!activeCategory && !searchQuery && (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
                 {CATEGORIES.sort((a, b) => a.order - b.order).map(cat => {
                   const count = getCommandsByCategory(cat.key).length;
                   return (
@@ -209,7 +243,7 @@ export default function Home() {
 
             {/* Commands Grid */}
             {(activeCategory || searchQuery) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                 {filteredCommands.map(cmd => (
                   <button key={cmd.id} onClick={() => { setSelectedCommand(cmd); setFormValues({}); setOutput(""); }}
                     className="group bg-[#141414] border border-[#262626] rounded-xl p-4 hover:border-amber-500/30 hover:bg-[#1a1a1a] transition-all text-right">
@@ -309,6 +343,84 @@ export default function Home() {
           </div>
         )}
       </main>
+      </div>{/* end min-h-screen flex */}
+
+      {/* Mobile Bottom Navigation */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0f0f0f] border-t border-[#262626] safe-bottom">
+        <div className="flex items-center justify-around py-2">
+          <button onClick={() => { setActiveCategory(null); setSearchQuery(""); setSelectedCommand(null); setOutput(""); }} className="flex flex-col items-center gap-0.5 px-3 py-1">
+            <span className="text-lg">🏠</span>
+            <span className="text-[10px] text-neutral-400">الرئيسية</span>
+          </button>
+          <a href="/accounts" className="flex flex-col items-center gap-0.5 px-3 py-1">
+            <span className="text-lg">📱</span>
+            <span className="text-[10px] text-neutral-400">حسابات</span>
+          </a>
+          <a href="/subscription" className="flex flex-col items-center gap-0.5 px-3 py-1">
+            <span className="text-lg">💳</span>
+            <span className="text-[10px] text-neutral-400">اشتراك</span>
+          </a>
+          {user?.role === "admin" && (
+            <a href="/admin" className="flex flex-col items-center gap-0.5 px-3 py-1">
+              <span className="text-lg">⚙️</span>
+              <span className="text-[10px] text-neutral-400">أدمن</span>
+            </a>
+          )}
+          <button onClick={logout} className="flex flex-col items-center gap-0.5 px-3 py-1">
+            <span className="text-lg">🚪</span>
+            <span className="text-[10px] text-neutral-400">خروج</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Mobile Menu Component ───
+function MobileMenu({ user, activeCategory, searchQuery, setActiveCategory, setSearchQuery, logout }: any) {
+  return (
+    <div className="p-4">
+      {/* Logo */}
+      <div className="mb-4 pb-4 border-b border-[#262626]">
+        <h1 className="text-2xl font-black text-amber-500">NJADDER</h1>
+        <p className="text-xs text-neutral-500 mt-1">PRO v7.0 — 118 أمر</p>
+        <div className="mt-2 flex items-center justify-between">
+          <div>
+            <p className="text-sm text-white">{user?.username}</p>
+            <p className="text-[10px] text-amber-500">{user?.role === "admin" ? "👑 أدمن" : "👤 مستخدم"}</p>
+          </div>
+          <button onClick={logout} className="text-xs text-neutral-500 hover:text-red-400">خروج</button>
+        </div>
+      </div>
+
+      {/* Search */}
+      <input
+        type="text"
+        placeholder="🔍 بحث..."
+        value={searchQuery}
+        onChange={e => setSearchQuery(e.target.value)}
+        className="w-full bg-[#1a1a1a] text-white text-sm rounded-lg px-3 py-2.5 border border-[#333] focus:border-amber-500/50 focus:outline-none mb-3"
+      />
+
+      {/* Categories */}
+      <div className="space-y-1">
+        <button
+          onClick={() => setActiveCategory(null)}
+          className={`w-full text-right px-3 py-2.5 rounded-lg text-sm font-medium ${!activeCategory && !searchQuery ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "text-neutral-400"}`}
+        >
+          🏠 الرئيسية
+        </button>
+        {CATEGORIES.sort((a, b) => a.order - b.order).map(cat => (
+          <button
+            key={cat.key}
+            onClick={() => setActiveCategory(cat.key)}
+            className={`w-full text-right px-3 py-2.5 rounded-lg text-sm font-medium flex items-center justify-between ${activeCategory === cat.key ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "text-neutral-400"}`}
+          >
+            <span>{cat.nameAr}</span>
+            <span className="text-[10px] text-neutral-600">{getCommandsByCategory(cat.key).length}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

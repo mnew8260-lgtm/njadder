@@ -10,18 +10,46 @@
   --text-muted: #a3a3a3;
   --gold: #f59e0b;
   --gold-light: #fbbf24;
+  --sidebar-w: 16rem;
 }
 
-* { box-sizing: border-box; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html { -webkit-text-size-adjust: 100%; }
 
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   direction: rtl;
+  margin: 0;
+  padding: 0;
+  overscroll-behavior: none;
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
+/* ─── Mobile-first: sidebar becomes bottom nav ─── */
+@media (max-width: 768px) {
+  :root { --sidebar-w: 0rem; }
+}
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+/* Safe area for notch */
+@supports (padding: env(safe-area-inset-top)) {
+  .safe-top { padding-top: env(safe-area-inset-top); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+/* Touch-friendly tap targets */
+button, a, input, select, textarea {
+  touch-action: manipulation;
+}
+
+/* Prevent text selection on buttons */
+button { -webkit-user-select: none; user-select: none; }
+
+/* Smooth scrolling */
+body { -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }

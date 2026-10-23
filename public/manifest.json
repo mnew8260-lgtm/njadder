@@ -1,0 +1,11 @@
+{
+  "name": "NJADDER PRO",
+  "short_name": "NJADDER",
+  "description": "أداة تيليجرام الذهبية — 118 أمر",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "orientation": "portrait",
+  "icons": []
+}
