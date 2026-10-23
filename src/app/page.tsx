@@ -164,6 +164,7 @@ export default function Home() {
         </nav>
 
         <div className="p-3 border-t border-[#262626] space-y-2">
+          <a href="/accounts" className="block text-center text-xs text-amber-500 hover:text-amber-400">📱 إضافة حساب</a>
           <a href="/subscription" className="block text-center text-xs text-amber-500 hover:text-amber-400">💳 الاشتراك</a>
           {user?.role === "admin" && (
             <a href="/admin" className="block text-center text-xs text-neutral-400 hover:text-white">⚙️ الأدمن</a>
