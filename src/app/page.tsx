@@ -300,14 +300,39 @@ export default function Home() {
                       {field.required && <span className="text-red-400 mr-1">*</span>}
                     </label>
                     {field.type === "textarea" ? (
-                      <textarea
-                        className="w-full bg-[#0a0a0a] text-white text-sm rounded-lg px-3 py-2 border border-[#333] focus:border-amber-500/50 focus:outline-none"
-                        placeholder={field.placeholder}
-                        dir="ltr"
-                        rows={4}
-                        value={formValues[field.name] || ""}
-                        onChange={e => setFormValues({ ...formValues, [field.name]: e.target.value })}
-                      />
+                      <>
+                        <textarea
+                          className="w-full bg-[#0a0a0a] text-white text-sm rounded-lg px-3 py-2 border border-[#333] focus:border-amber-500/50 focus:outline-none"
+                          placeholder={field.placeholder}
+                          dir="ltr"
+                          rows={4}
+                          value={formValues[field.name] || ""}
+                          onChange={e => setFormValues({ ...formValues, [field.name]: e.target.value })}
+                        />
+                        <label className="mt-2 flex items-center justify-center gap-2 w-full bg-[#1a1a1a] text-neutral-400 text-xs rounded-lg py-2 border border-[#333] hover:border-amber-500/30 hover:text-amber-400 transition-colors cursor-pointer">
+                          📎 تحميل ملف CSV/TXT
+                          <input
+                            type="file"
+                            accept=".csv,.txt"
+                            className="hidden"
+                            onChange={e => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = (ev) => {
+                                const text = ev.target?.result as string;
+                                setFormValues({ ...formValues, [field.name]: text.trim() });
+                              };
+                              reader.readAsText(file);
+                            }}
+                          />
+                        </label>
+                        {formValues[field.name] && (
+                          <p className="text-[10px] text-green-400 mt-1">
+                            ✓ تم تحميل {formValues[field.name].split("\n").filter(l => l.trim()).length} سطر
+                          </p>
+                        )}
+                      </>
                     ) : (
                       <input
                         type={field.type === "number" ? "number" : field.type === "tel" ? "tel" : "text"}
