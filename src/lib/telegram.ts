@@ -119,6 +119,47 @@ export async function verify2FA(
   }
 }
 
+// ─── Import session helpers ──────────────────────────────
+// يستورد جلسة تيليجرام موجودة (StringSession) ويتحقق من صحتها
+export async function importSession(
+  sessionString: string,
+  apiId?: number,
+  apiHash?: string
+) {
+  const cleaned = (sessionString || "").trim();
+  if (!cleaned) {
+    return { ok: false, error: "الجلسة فارغة" };
+  }
+
+  // GramJS StringSession تبدأ بـ "1" أو تكون Base64 طويل
+  // Telethon StringSession تبدأ بـ "1" (v1) أو "2" (v2) أو تحوي "_"
+  // سنحاول تشغيلها مباشرة؛ إن فشلت نعطي رسالة واضحة
+  const client = buildClient(cleaned, { apiId, apiHash });
+  try {
+    await client.connect();
+    if (!(await client.isUserAuthorized())) {
+      await client.disconnect();
+      return { ok: false, error: "الجلسة غير مصرّح بها (قد تكون قديمة أو غير صالحة)" };
+    }
+    const me: any = await client.getMe();
+    return {
+      ok: true,
+      sessionString: String(client.session.save() as any),
+      user: {
+        id: String(me.id),
+        firstName: me.firstName || "",
+        lastName: me.lastName || "",
+        username: me.username || "",
+        phone: me.phone || "",
+      },
+    };
+  } catch (e: any) {
+    return { ok: false, error: e.message?.substring(0, 250) || "فشل التحقق من الجلسة" };
+  } finally {
+    try { await client.disconnect(); } catch {}
+  }
+}
+
 // ─── Scrape helpers ──────────────────────────────────────
 export async function scrapeGroupMembers(client: TelegramClient, groupInput: string, limit: number = 100) {
   try {

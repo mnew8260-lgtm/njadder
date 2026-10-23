@@ -25,19 +25,19 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
 
   try {
-    const { action, phone, code, sessionString, phoneCodeHash, password, apiId, apiHash } = await req.json();
+    const { action, phone, code, sessionString, phoneCodeHash, password, apiId, apiHash, session, name } = await req.json();
     await ensureSchema();
 
-    const { sendCode, verifyCode, verify2FA } = await import("@/lib/telegram");
+    const { sendCode, verifyCode, verify2FA, importSession } = await import("@/lib/telegram");
 
     if (action === "send_code") {
       if (!phone) return NextResponse.json({ ok: false, error: "phone required" }, { status: 400 });
-      const result = await sendCode(phone, apiId, apiHash);
+      const result = await sendCode(phone, apiId ? Number(apiId) : undefined, apiHash);
       return NextResponse.json(result);
     }
 
     if (action === "verify_code") {
-      const result = await verifyCode(phone, code, sessionString, phoneCodeHash, apiId, apiHash);
+      const result = await verifyCode(phone, code, sessionString, phoneCodeHash, apiId ? Number(apiId) : undefined, apiHash);
       if (result.ok && result.sessionString) {
         // Save to DB
         const id = `tg_${Date.now()}_${Math.random().toString(36).substring(7)}`;
@@ -51,13 +51,31 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "verify_2fa") {
-      const result = await verify2FA(password, sessionString, apiId, apiHash);
+      const result = await verify2FA(password, sessionString, apiId ? Number(apiId) : undefined, apiHash);
       if (result.ok && result.sessionString) {
+        const id = `tg_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        const u: any = result.user || {};
+        await sql`
+          INSERT INTO telegram_accounts (id, owner_id, phone, session_string, api_id, api_hash, full_name, username, status)
+          VALUES (${id}, ${user.id}, ${phone || u.phone || ""}, ${result.sessionString}, ${apiId || null}, ${apiHash || null}, ${u.firstName || ""}, ${u.username || ""}, 'active')
+          ON CONFLICT (owner_id, phone) DO UPDATE SET session_string = EXCLUDED.session_string, status = 'active'
+        `;
+      }
+      return NextResponse.json(result);
+    }
+
+    // ─── استيراد جلسة من ملف أو نص ─────────────────────────
+    if (action === "import_session") {
+      if (!session) return NextResponse.json({ ok: false, error: "session string مطلوبة" }, { status: 400 });
+      const result = await importSession(session, apiId ? Number(apiId) : undefined, apiHash);
+      if (result.ok && result.sessionString) {
+        const u: any = result.user || {};
+        const accPhone = phone || u.phone || "";
         const id = `tg_${Date.now()}_${Math.random().toString(36).substring(7)}`;
         await sql`
           INSERT INTO telegram_accounts (id, owner_id, phone, session_string, api_id, api_hash, full_name, username, status)
-          VALUES (${id}, ${user.id}, ${phone || ""}, ${result.sessionString}, ${apiId || null}, ${apiHash || null}, ${result.user?.firstName || ""}, ${result.user?.username || ""}, 'active')
-          ON CONFLICT (owner_id, phone) DO UPDATE SET session_string = EXCLUDED.session_string, status = 'active'
+          VALUES (${id}, ${user.id}, ${accPhone}, ${result.sessionString}, ${apiId || null}, ${apiHash || null}, ${u.firstName || ""}, ${u.username || ""}, 'active')
+          ON CONFLICT (owner_id, phone) DO UPDATE SET session_string = EXCLUDED.session_string, status = 'active', full_name = EXCLUDED.full_name, username = EXCLUDED.username
         `;
       }
       return NextResponse.json(result);
