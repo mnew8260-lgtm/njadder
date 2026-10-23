@@ -15,6 +15,15 @@ export default function Home() {
   const [executing, setExecuting] = useState(false);
   const [output, setOutput] = useState("");
   const [formValues, setFormValues] = useState<Record<string, string>>({});
+  // ─── Login flow state (for cmd "login") ───
+  const [loginStep, setLoginStep] = useState<"form" | "code" | "2fa" | "done">("form");
+  const [loginPhone, setLoginPhone] = useState("");
+  const [loginCode, setLoginCode] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginSession, setLoginSession] = useState("");
+  const [loginHash, setLoginHash] = useState("");
+  const [loginApiId, setLoginApiId] = useState("");
+  const [loginApiHash, setLoginApiHash] = useState("");
   const router = useRouter();
 
   useEffect(() => {
@@ -65,6 +74,72 @@ export default function Home() {
     await fetch("/api/auth/login", { method: "DELETE" }).catch(() => {});
     document.cookie = "njadder_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     router.push("/login");
+  }
+
+  // ─── Login flow: send code → verify → 2FA ───
+  async function doLoginSendCode() {
+    if (!loginPhone) { setOutput("❌ أدخل رقم الهاتف"); return; }
+    setExecuting(true); setOutput("⏳ جاري إرسال الكود...");
+    try {
+      const res = await fetch("/api/accounts", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "send_code", phone: loginPhone, apiId: loginApiId || undefined, apiHash: loginApiHash || undefined }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setLoginSession(data.sessionString);
+        setLoginHash(data.phoneCodeHash);
+        setLoginStep("code");
+        setOutput("✅ تم إرسال الكود إلى تيليجرام. أدخل الكود بالأسفل.");
+      } else { setOutput("❌ " + (data.error || "فشل")); }
+    } catch (e: any) { setOutput("❌ " + e.message); }
+    setExecuting(false);
+  }
+
+  async function doLoginVerifyCode() {
+    if (!loginCode) { setOutput("❌ أدخل الكود"); return; }
+    setExecuting(true); setOutput("⏳ جاري التحقق...");
+    try {
+      const res = await fetch("/api/accounts", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "verify_code", phone: loginPhone, code: loginCode, sessionString: loginSession, phoneCodeHash: loginHash, apiId: loginApiId || undefined, apiHash: loginApiHash || undefined }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setLoginStep("done");
+        setOutput("✅ تمت إضافة الحساب بنجاح!");
+        loadAccounts();
+      } else if (data.need2FA) {
+        setLoginStep("2fa");
+        setOutput("🔐 هذا الحساب مفعّل عليه 2FA. أدخل كلمة المرور بالأسفل.");
+      } else { setOutput("❌ " + (data.error || "فشل")); }
+    } catch (e: any) { setOutput("❌ " + e.message); }
+    setExecuting(false);
+  }
+
+  async function doLoginVerify2FA() {
+    if (!loginPassword) { setOutput("❌ أدخل كلمة المرور"); return; }
+    setExecuting(true); setOutput("⏳ جاري التحقق...");
+    try {
+      const res = await fetch("/api/accounts", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "verify_2fa", phone: loginPhone, password: loginPassword, sessionString: loginSession, apiId: loginApiId || undefined, apiHash: loginApiHash || undefined }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setLoginStep("done");
+        setOutput("✅ تمت إضافة الحساب بنجاح!");
+        loadAccounts();
+      } else { setOutput("❌ " + (data.error || "فشل")); }
+    } catch (e: any) { setOutput("❌ " + e.message); }
+    setExecuting(false);
+  }
+
+  function resetLoginFlow() {
+    setLoginStep("form");
+    setLoginPhone(""); setLoginCode(""); setLoginPassword("");
+    setLoginSession(""); setLoginHash("");
+    setOutput("");
   }
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-neutral-500">⏳</div>;
@@ -150,7 +225,7 @@ export default function Home() {
         {/* ─── Command Execution ─── */}
         {selectedCommand && (
           <div className="max-w-2xl mx-auto">
-            <button onClick={() => { setSelectedCommand(null); setOutput(""); }}
+            <button onClick={() => { setSelectedCommand(null); setOutput(""); resetLoginFlow(); }}
               className="text-sm text-neutral-500 hover:text-amber-500 mb-4">← رجوع</button>
 
             <div className="bg-[#141414] border border-[#1a1a1a] rounded-2xl p-5 mb-4">
@@ -162,67 +237,152 @@ export default function Home() {
               <p className="text-sm text-neutral-500 mt-1">{selectedCommand.description}</p>
             </div>
 
-            {/* Account */}
-            <div className="bg-[#141414] border border-[#1a1a1a] rounded-2xl p-4 mb-4">
-              <label className="block text-sm text-neutral-400 mb-2">📱 الحساب</label>
-              {accounts.length === 0 ? (
-                <a href="/accounts" className="text-sm text-amber-500 hover:underline">لا يوجد حسابات — أضف حساباً ←</a>
-              ) : (
-                <select value={selectedAccount} onChange={e => setSelectedAccount(e.target.value)}
-                  className="w-full bg-[#0a0a0a] text-white rounded-lg px-3 py-2.5 border border-[#222] focus:border-amber-500/30 focus:outline-none">
-                  {accounts.map(a => <option key={a.id} value={a.id}>{a.full_name || a.phone}</option>)}
-                </select>
-              )}
-            </div>
-
-            {/* Fields */}
-            {selectedCommand.fields.length > 0 && (
-              <div className="bg-[#141414] border border-[#1a1a1a] rounded-2xl p-4 mb-4 space-y-3">
-                {selectedCommand.fields.map(field => (
-                  <div key={field.name}>
-                    <label className="block text-sm text-neutral-300 mb-1">
-                      {field.label}{field.required && <span className="text-red-400 mr-1">*</span>}
-                    </label>
-                    {field.type === "textarea" ? (
-                      <>
-                        <textarea className="w-full bg-[#0a0a0a] text-white text-sm rounded-lg px-3 py-2 border border-[#222] focus:border-amber-500/30 focus:outline-none"
-                          placeholder={field.placeholder} dir="ltr" rows={4}
-                          value={formValues[field.name] || ""}
-                          onChange={e => setFormValues({ ...formValues, [field.name]: e.target.value })}
-                        />
-                        <label className="mt-2 flex items-center justify-center gap-2 w-full bg-[#1a1a1a] text-neutral-400 text-xs rounded-lg py-2 border border-[#222] hover:border-amber-500/30 hover:text-amber-500 transition-colors cursor-pointer">
-                          📎 تحميل ملف CSV/TXT
-                          <input type="file" accept=".csv,.txt" className="hidden"
-                            onChange={e => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = (ev) => setFormValues({ ...formValues, [field.name]: (ev.target?.result as string).trim() }); r.readAsText(f); }}
-                          />
-                        </label>
-                        {formValues[field.name] && <p className="text-[10px] text-green-400 mt-1">✓ {formValues[field.name].split("\n").filter(l => l.trim()).length} سطر</p>}
-                      </>
-                    ) : (
-                      <input type={field.type === "number" ? "number" : field.type === "tel" ? "tel" : "text"}
-                        className="w-full bg-[#0a0a0a] text-white text-sm rounded-lg px-3 py-2 border border-[#222] focus:border-amber-500/30 focus:outline-none"
-                        placeholder={field.placeholder}
-                        value={formValues[field.name] ?? field.default ?? ""}
-                        onChange={e => setFormValues({ ...formValues, [field.name]: e.target.value })}
-                        dir={field.type === "tel" || field.type === "url" ? "ltr" : "rtl"}
-                      />
-                    )}
-                    {field.helper && <p className="text-[10px] text-neutral-600 mt-1">{field.helper}</p>}
+            {/* ─── Special: Login flow (cmd.key === "login") ─── */}
+            {selectedCommand.key === "login" ? (
+              <>
+                {/* Step 1: Phone */}
+                {loginStep === "form" && (
+                  <div className="bg-[#141414] border border-[#1a1a1a] rounded-2xl p-4 mb-4 space-y-3">
+                    <div>
+                      <label className="block text-sm text-neutral-300 mb-1">📱 رقم الهاتف *</label>
+                      <input type="tel" className="w-full bg-[#0a0a0a] text-white text-base rounded-lg px-3 py-3 border border-[#222] focus:border-amber-500/30 focus:outline-none"
+                        placeholder="+9665XXXXXXXX" value={loginPhone} onChange={e => setLoginPhone(e.target.value)} dir="ltr" autoFocus />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm text-neutral-300 mb-1">API ID (اختياري)</label>
+                        <input type="text" className="w-full bg-[#0a0a0a] text-white text-sm rounded-lg px-3 py-2 border border-[#222] focus:border-amber-500/30 focus:outline-none"
+                          placeholder="افتراضي" value={loginApiId} onChange={e => setLoginApiId(e.target.value)} dir="ltr" />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-neutral-300 mb-1">API Hash (اختياري)</label>
+                        <input type="text" className="w-full bg-[#0a0a0a] text-white text-sm rounded-lg px-3 py-2 border border-[#222] focus:border-amber-500/30 focus:outline-none"
+                          placeholder="افتراضي" value={loginApiHash} onChange={e => setLoginApiHash(e.target.value)} dir="ltr" />
+                      </div>
+                    </div>
+                    <button onClick={doLoginSendCode} disabled={executing || !loginPhone}
+                      className="w-full bg-amber-500 text-black font-bold rounded-xl py-3 hover:bg-amber-400 transition-colors disabled:opacity-50 active:scale-[0.98]">
+                      {executing ? "⏳ جاري الإرسال..." : "📨 إرسال الكود"}
+                    </button>
                   </div>
-                ))}
-              </div>
-            )}
+                )}
 
-            <button onClick={executeCommand} disabled={executing || !selectedAccount}
-              className="w-full bg-amber-500 text-black font-bold rounded-xl py-3 hover:bg-amber-400 transition-colors disabled:opacity-50 active:scale-[0.98] mb-4">
-              {executing ? "⏳ جاري التنفيذ..." : "⚡ تنفيذ الأمر"}
-            </button>
+                {/* Step 2: Code */}
+                {loginStep === "code" && (
+                  <div className="bg-[#141414] border border-[#1a1a1a] rounded-2xl p-4 mb-4 space-y-3">
+                    <div className="text-center text-sm text-amber-500">✅ تم إرسال الكود إلى {loginPhone}</div>
+                    <div>
+                      <label className="block text-sm text-neutral-300 mb-1">📩 الكود</label>
+                      <input type="text" className="w-full bg-[#0a0a0a] text-white text-center text-2xl tracking-widest font-mono rounded-lg px-3 py-4 border border-[#222] focus:border-amber-500/30 focus:outline-none"
+                        placeholder="12345" maxLength={6} value={loginCode} onChange={e => setLoginCode(e.target.value.replace(/\D/g, ""))} dir="ltr" autoFocus
+                        onKeyDown={e => e.key === "Enter" && doLoginVerifyCode()} />
+                    </div>
+                    <button onClick={doLoginVerifyCode} disabled={executing || !loginCode}
+                      className="w-full bg-amber-500 text-black font-bold rounded-xl py-3 hover:bg-amber-400 transition-colors disabled:opacity-50 active:scale-[0.98]">
+                      {executing ? "⏳ جاري التحقق..." : "✓ تحقق"}
+                    </button>
+                  </div>
+                )}
 
-            {output && (
-              <div className="bg-[#0a0a0a] border border-[#222] rounded-xl p-4">
-                <h3 className="text-sm font-bold text-amber-500 mb-2">📤 النتيجة</h3>
-                <pre className="text-sm text-neutral-300 whitespace-pre-wrap font-mono" dir="ltr">{output}</pre>
-              </div>
+                {/* Step 3: 2FA */}
+                {loginStep === "2fa" && (
+                  <div className="bg-[#141414] border border-[#1a1a1a] rounded-2xl p-4 mb-4 space-y-3">
+                    <div className="text-center text-sm text-amber-500">🔐 التحقق بخطوتين (2FA)</div>
+                    <div>
+                      <label className="block text-sm text-neutral-300 mb-1">🔑 كلمة مرور 2FA</label>
+                      <input type="password" className="w-full bg-[#0a0a0a] text-white text-base rounded-lg px-3 py-3 border border-[#222] focus:border-amber-500/30 focus:outline-none"
+                        placeholder="••••••••" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} dir="ltr" autoFocus
+                        onKeyDown={e => e.key === "Enter" && doLoginVerify2FA()} />
+                    </div>
+                    <button onClick={doLoginVerify2FA} disabled={executing || !loginPassword}
+                      className="w-full bg-amber-500 text-black font-bold rounded-xl py-3 hover:bg-amber-400 transition-colors disabled:opacity-50 active:scale-[0.98]">
+                      {executing ? "⏳ جاري التحقق..." : "✓ تحقق"}
+                    </button>
+                  </div>
+                )}
+
+                {/* Step 4: Done */}
+                {loginStep === "done" && (
+                  <div className="bg-[#141414] border border-[#1a1a1a] rounded-2xl p-6 mb-4 text-center">
+                    <div className="text-4xl mb-3">✅</div>
+                    <p className="text-lg font-bold text-white mb-2">تمت إضافة الحساب بنجاح!</p>
+                    <button onClick={() => { setSelectedCommand(null); resetLoginFlow(); }}
+                      className="mt-3 text-sm text-amber-500 hover:underline">← العودة للأوامر</button>
+                  </div>
+                )}
+
+                {output && (
+                  <div className="bg-[#0a0a0a] border border-[#222] rounded-xl p-4">
+                    <pre className="text-sm text-neutral-300 whitespace-pre-wrap font-mono" dir="ltr">{output}</pre>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* ─── Normal command execution ─── */}
+                {/* Account */}
+                <div className="bg-[#141414] border border-[#1a1a1a] rounded-2xl p-4 mb-4">
+                  <label className="block text-sm text-neutral-400 mb-2">📱 الحساب</label>
+                  {accounts.length === 0 ? (
+                    <a href="/accounts" className="text-sm text-amber-500 hover:underline">لا يوجد حسابات — أضف حساباً ←</a>
+                  ) : (
+                    <select value={selectedAccount} onChange={e => setSelectedAccount(e.target.value)}
+                      className="w-full bg-[#0a0a0a] text-white rounded-lg px-3 py-2.5 border border-[#222] focus:border-amber-500/30 focus:outline-none">
+                      {accounts.map(a => <option key={a.id} value={a.id}>{a.full_name || a.phone}</option>)}
+                    </select>
+                  )}
+                </div>
+
+                {/* Fields */}
+                {selectedCommand.fields.length > 0 && (
+                  <div className="bg-[#141414] border border-[#1a1a1a] rounded-2xl p-4 mb-4 space-y-3">
+                    {selectedCommand.fields.map(field => (
+                      <div key={field.name}>
+                        <label className="block text-sm text-neutral-300 mb-1">
+                          {field.label}{field.required && <span className="text-red-400 mr-1">*</span>}
+                        </label>
+                        {field.type === "textarea" ? (
+                          <>
+                            <textarea className="w-full bg-[#0a0a0a] text-white text-sm rounded-lg px-3 py-2 border border-[#222] focus:border-amber-500/30 focus:outline-none"
+                              placeholder={field.placeholder} dir="ltr" rows={4}
+                              value={formValues[field.name] || ""}
+                              onChange={e => setFormValues({ ...formValues, [field.name]: e.target.value })}
+                            />
+                            <label className="mt-2 flex items-center justify-center gap-2 w-full bg-[#1a1a1a] text-neutral-400 text-xs rounded-lg py-2 border border-[#222] hover:border-amber-500/30 hover:text-amber-500 transition-colors cursor-pointer">
+                              📎 تحميل ملف CSV/TXT
+                              <input type="file" accept=".csv,.txt" className="hidden"
+                                onChange={e => { const f = e.target.files?.[0]; if (!f) return; const r = new FileReader(); r.onload = (ev) => setFormValues({ ...formValues, [field.name]: (ev.target?.result as string).trim() }); r.readAsText(f); }}
+                              />
+                            </label>
+                            {formValues[field.name] && <p className="text-[10px] text-green-400 mt-1">✓ {formValues[field.name].split("\n").filter(l => l.trim()).length} سطر</p>}
+                          </>
+                        ) : (
+                          <input type={field.type === "number" ? "number" : field.type === "tel" ? "tel" : "text"}
+                            className="w-full bg-[#0a0a0a] text-white text-sm rounded-lg px-3 py-2 border border-[#222] focus:border-amber-500/30 focus:outline-none"
+                            placeholder={field.placeholder}
+                            value={formValues[field.name] ?? field.default ?? ""}
+                            onChange={e => setFormValues({ ...formValues, [field.name]: e.target.value })}
+                            dir={field.type === "tel" || field.type === "url" ? "ltr" : "rtl"}
+                          />
+                        )}
+                        {field.helper && <p className="text-[10px] text-neutral-600 mt-1">{field.helper}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <button onClick={executeCommand} disabled={executing || !selectedAccount}
+                  className="w-full bg-amber-500 text-black font-bold rounded-xl py-3 hover:bg-amber-400 transition-colors disabled:opacity-50 active:scale-[0.98] mb-4">
+                  {executing ? "⏳ جاري التنفيذ..." : "⚡ تنفيذ الأمر"}
+                </button>
+
+                {output && (
+                  <div className="bg-[#0a0a0a] border border-[#222] rounded-xl p-4">
+                    <h3 className="text-sm font-bold text-amber-500 mb-2">📤 النتيجة</h3>
+                    <pre className="text-sm text-neutral-300 whitespace-pre-wrap font-mono" dir="ltr">{output}</pre>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
