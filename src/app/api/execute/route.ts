@@ -183,6 +183,69 @@ async function executeCommand(
 
     // ─── Account tools ───
     if (cmd.category === "login") {
+      // ─── Login (add new account) ───
+      if (cmd.key === "login") {
+        const newPhone = params.phone;
+        if (!newPhone) return { ok: false, output: "رقم الهاتف مطلوب" };
+
+        // Check if already exists
+        const existing = await sql`SELECT id FROM telegram_accounts WHERE owner_id = ${userId} AND phone = ${newPhone}`;
+        if (existing.length > 0) return { ok: false, output: "هذا الحساب موجود بالفعل" };
+
+        const { sendCode } = await import("@/lib/telegram");
+        const result = await sendCode(newPhone, params.apiId ? Number(params.apiId) : undefined, params.apiHash);
+
+        if (result.ok && result.sessionString) {
+          // Save temp session for verification
+          await sql`
+            INSERT INTO telegram_accounts (id, owner_id, phone, session_string, api_id, api_hash, status)
+            VALUES (${"tg_temp_" + Date.now()}, ${userId}, ${newPhone}, ${result.sessionString}, ${params.apiId || null}, ${params.apiHash || null}, 'pending_code')
+            ON CONFLICT (owner_id, phone) DO UPDATE SET session_string = EXCLUDED.session_string, status = 'pending_code'
+          `;
+          return {
+            ok: true,
+            output: `✅ تم إرسال الكود إلى ${newPhone}\n\nالخطوة التالية:\nاختر أمر "تسجيل دخول بملف CSV" أو استخدم صفحة الحسابات للتحقق من الكود.\n\nSession: ${result.sessionString.substring(0, 50)}...`,
+          };
+        }
+        return { ok: false, output: result.error || "فشل إرسال الكود" };
+      }
+
+      // ─── Login by CSV (verify code for pending account) ───
+      if (cmd.key === "loginbycsv") {
+        const phonesList = params.phonesList || "";
+        if (!phonesList) return { ok: false, output: "قائمة الأرقام مطلوبة (رقم في كل سطر)" };
+
+        const phones = phonesList.split("\n").map((p: string) => p.trim()).filter(Boolean);
+        const { sendCode } = await import("@/lib/telegram");
+        const results: string[] = [];
+        let success = 0;
+
+        for (const p of phones) {
+          try {
+            const result = await sendCode(p);
+            if (result.ok && result.sessionString) {
+              await sql`
+                INSERT INTO telegram_accounts (id, owner_id, phone, session_string, status)
+                VALUES (${"tg_" + Date.now() + "_" + Math.random().toString(36).substring(7)}, ${userId}, ${p}, ${result.sessionString}, 'pending_code')
+                ON CONFLICT (owner_id, phone) DO UPDATE SET session_string = EXCLUDED.session_string, status = 'pending_code'
+              `;
+              results.push(`✓ ${p} — تم إرسال الكود`);
+              success++;
+            } else {
+              results.push(`✗ ${p} — ${result.error || "فشل"}`);
+            }
+          } catch (e: any) {
+            results.push(`✗ ${p} — ${e.message?.substring(0, 60)}`);
+          }
+          await new Promise(r => setTimeout(r, 3000));
+        }
+
+        return {
+          ok: true,
+          output: `📊 النتائج: ${success}/${phones.length} نجح\n\n` + results.join("\n"),
+        };
+      }
+
       if (cmd.key === "accountinfogetter") {
         const me = await client.getMe();
         const info = [
