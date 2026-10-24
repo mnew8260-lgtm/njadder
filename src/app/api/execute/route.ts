@@ -260,17 +260,67 @@ async function executeCommand(
     // [23-29] SCRAPERS
     // ═══════════════════════════════════════════════════════
     if (cmd.category === "scrapers") {
-      const group = params.groupLink || params.sourceGroup || "";
-      const limit = Number(params.count || 100);
+      // 🎯 دعم أسماء حقول متعددة (groupLink / sourceGroup / targetGroup / groups)
+      const group = params.groupLink || params.sourceGroup || params.targetGroup || params.group || "";
+      const multiGroups = (params.groups || "").split("\n").map((g: string) => g.trim()).filter(Boolean);
+      const limit = Number(params.count || params.limit || 100);
+
+      // multi_ccraper: استخراج من عدة مجموعات
+      if (cmd.key === "multi_ccraper" || multiGroups.length > 1) {
+        if (!multiGroups.length) return { ok: false, output: "أدخل روابط المجموعات (سطر لكل رابط)" };
+        addLog(`📥 استخراج من ${multiGroups.length} مجموعة`);
+        const allMembers: any[] = [];
+        for (const g of multiGroups) {
+          try {
+            const ms = await scrapeGroupMembers(client, g, limit);
+            allMembers.push(...ms);
+            addLog(`✓ ${g}: ${ms.length} عضو`);
+          } catch (e: any) {
+            addLog(`✗ ${g}: ${e.message?.substring(0, 60)}`);
+          }
+          await smartDelay(2);
+        }
+        const valid = allMembers.filter(m => !m.is_bot && !m.is_deleted);
+        // إزالة التكرار بـ id
+        const seen = new Set<string>();
+        const unique = valid.filter(m => {
+          if (seen.has(String(m.id))) return false;
+          seen.add(String(m.id));
+          return true;
+        });
+        addLog(`📊 المجموع: ${allMembers.length} | فريد: ${unique.length}`);
+        const csv = unique.map(m => `${m.id}|${m.access_hash}|${m.first_name}|${m.last_name}|${m.username}`).join("\n");
+        return { ok: true, output: log.join("\n") + "\n\n--- النتائج ---\n" + csv };
+      }
+
       if (!group) return { ok: false, output: "رابط المجموعة مطلوب" };
 
       addLog(`📥 جاري السحب من: ${group}`);
-      const members = await scrapeGroupMembers(client, group, limit);
-      const valid = members.filter(m => !m.is_bot && !m.is_deleted);
-      addLog(`✓ تم سحب ${members.length} عضو (${valid.length} صالح)`);
+      try {
+        const members = await scrapeGroupMembers(client, group, limit);
+        const valid = members.filter(m => !m.is_bot && !m.is_deleted);
+        addLog(`✓ تم سحب ${members.length} عضو (${valid.length} صالح)`);
 
-      const csv = valid.map(m => `${m.id}|${m.access_hash}|${m.first_name}|${m.last_name}|${m.username}`).join("\n");
-      return { ok: true, output: log.join("\n") + "\n\n--- النتائج ---\n" + csv };
+        // فلترة إضافية حسب نوع الأمر
+        let filtered = valid;
+        if (cmd.key === "premiumscraper") {
+          filtered = valid.filter((m: any) => m.is_premium);
+          addLog(`⭐ بريميوم: ${filtered.length}`);
+        }
+        if (cmd.key === "hiddenscraper" || cmd.key === "pvthiddenscraper") {
+          // الأعضاء المخفيين = اللي ما عندهم last_name و username غالباً
+          filtered = valid.filter((m: any) => !m.username && !m.last_name);
+          addLog(`👻 مخفي: ${filtered.length}`);
+        }
+        if (cmd.key === "fullscraper") {
+          addLog(`📊 توزيع: ${valid.filter(m => m.username).length} يوزر | ${valid.filter((m: any) => m.is_premium).length} بريميوم`);
+        }
+
+        const csv = filtered.map(m => `${m.id}|${m.access_hash}|${m.first_name}|${m.last_name}|${m.username}`).join("\n");
+        return { ok: true, output: log.join("\n") + "\n\n--- النتائج ---\n" + csv };
+      } catch (e: any) {
+        return { ok: false, output: log.join("\n") + `\n\n❌ خطأ: ${e.message?.substring(0, 150)}` };
+      }
     }
 
     // ═══════════════════════════════════════════════════════
@@ -299,9 +349,11 @@ async function executeCommand(
     // [41-58] ADDERS
     // ═══════════════════════════════════════════════════════
     if (cmd.category === "adders") {
-      const target = params.targetGroup || "";
-      const source = params.sourceGroup || "";
-      const count = Number(params.count || 50);
+      // 🎯 دعم أسماء حقول متعددة
+      const target = params.targetGroup || params.target || params.destinationGroup || "";
+      const source = params.sourceGroup || params.source || "";
+      const userListRaw = params.userList || params.inputFile || params.membersList || params.phonesList || "";
+      const count = Number(params.count || params.limit || 50);
       const delay = Number(params.delay || 3);
       if (!target) return { ok: false, output: "رابط المجموعة الهدف مطلوب" };
 
@@ -311,17 +363,30 @@ async function executeCommand(
 
       let users: any[] = [];
       if (source) {
+        // مصدر + هدف: سحب من المصدر ثم إضافة للهدف
         addLog(`📥 سحب من المصدر: ${source}`);
-        users = await scrapeGroupMembers(client, source, count * 2);
-        users = users.filter(u => !u.is_bot && !u.is_deleted).slice(0, count);
-        addLog(`✓ سُحب ${users.length} عضو`);
-      } else if (params.userList) {
-        users = String(params.userList).split("\n").map((line: string) => {
+        try {
+          users = await scrapeGroupMembers(client, source, count * 2);
+          users = users.filter(u => !u.is_bot && !u.is_deleted).slice(0, count);
+          addLog(`✓ سُحب ${users.length} عضو`);
+        } catch (e: any) {
+          return { ok: false, output: `❌ فشل السحب من المصدر: ${e.message?.substring(0, 100)}` };
+        }
+      } else if (userListRaw) {
+        // قائمة مستخدمين جاهزة (CSV: id|access_hash|first_name|last_name|username)
+        users = String(userListRaw).split("\n").map((line: string) => {
           const parts = line.split("|").map(p => p.trim());
-          return { id: parts[0], access_hash: parts[1] || "", first_name: parts[2] || "" };
-        }).filter((u: any) => u.id);
+          return {
+            id: parts[0],
+            access_hash: parts[1] || "",
+            first_name: parts[2] || "",
+            last_name: parts[3] || "",
+            username: parts[4] || "",
+          };
+        }).filter((u: any) => u.id && /^\d+$/.test(u.id));
+        addLog(`📋 تم تحميل ${users.length} عضو من القائمة`);
       }
-      if (!users.length) return { ok: false, output: "لا يوجد أعضاء" };
+      if (!users.length) return { ok: false, output: "لا يوجد أعضاء — أدخل مصدراً أو قائمة مستخدمين" };
 
       // 🚫 فلترة القائمة السوداء
       if (blacklistSet.size > 0) {
@@ -332,15 +397,30 @@ async function executeCommand(
       }
 
       addLog(`➕ إضافة ${users.length} إلى: ${target}`);
-      let added = 0, skipped = 0;
+      let added = 0, skipped = 0, already = 0, errors = 0;
+      const errorDetails: string[] = [];
       for (const u of users) {
         const result = await addSingleMember(client, target, u);
-        if (result.ok) { added++; addLog(`✓ ${u.first_name || u.id}`); }
-        else if (result.status === "flood") { addLog("⛔ Flood — توقف"); break; }
-        else { skipped++; }
+        if (result.ok) {
+          added++;
+          addLog(`✓ ${u.first_name || u.username || u.id}`);
+        } else if (result.status === "flood") {
+          addLog(`⛔ Flood — توقف. انتظر ${result.reason}`);
+          break;
+        } else if (result.status === "already") {
+          already++;
+        } else if (result.status === "skip") {
+          skipped++;
+        } else {
+          errors++;
+          if (errorDetails.length < 5) errorDetails.push(`${u.id}: ${result.reason}`);
+        }
         await smartDelay(delay);
       }
-      addLog(`\n📊 ✓ ${added} أُضيف | ⊘ ${skipped} تخطّي${blacklistedSkipped ? ` | 🚫 ${blacklistedSkipped} محظور` : ""}`);
+      addLog(`\n📊 ✓ ${added} أُضيف | ⊘ ${skipped} تخطّي | ⚠️ ${already} موجود | ❌ ${errors} خطأ${blacklistedSkipped ? ` | 🚫 ${blacklistedSkipped} محظور` : ""}`);
+      if (errorDetails.length) {
+        addLog(`\n--- أخطاء مفصّلة ---\n${errorDetails.join("\n")}`);
+      }
       return { ok: true, output: log.join("\n") };
     }
 

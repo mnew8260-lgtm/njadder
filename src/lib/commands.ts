@@ -543,12 +543,19 @@ export const COMMANDS: Command[] = [
     "description": "استخراج قائمة أعضاء من مجموعة عامة وحفظها في CSV.",
     "fields": [
       {
-        "name": "outputFile",
-        "label": "ملف الإخراج",
+        "name": "groupLink",
+        "label": "رابط المجموعة العامة",
         "type": "text",
-        "placeholder": "scraped.csv",
+        "placeholder": "@username أو https://t.me/groupname",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء",
+        "type": "number",
+        "placeholder": "100",
         "required": false,
-        "default": "\"scraped.csv\""
+        "default": 100
       }
     ],
     "pyFn": "scraper()",
@@ -569,6 +576,14 @@ export const COMMANDS: Command[] = [
         "type": "text",
         "placeholder": "https://t.me/+abc",
         "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء",
+        "type": "number",
+        "placeholder": "100",
+        "required": false,
+        "default": 100
       }
     ],
     "pyFn": "pvtscraper()",
@@ -582,7 +597,23 @@ export const COMMANDS: Command[] = [
     "category": "scrapers",
     "icon": "UserSearch",
     "description": "استخراج الأعضاء الذين أخفوا ظهورهم في المجموعات العامة.",
-    "fields": [],
+    "fields": [
+      {
+        "name": "groupLink",
+        "label": "رابط المجموعة",
+        "type": "text",
+        "placeholder": "@username",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء",
+        "type": "number",
+        "placeholder": "100",
+        "required": false,
+        "default": 100
+      }
+    ],
     "pyFn": "hiddenscraper()",
     "risk": "medium"
   },
@@ -599,8 +630,16 @@ export const COMMANDS: Command[] = [
         "name": "targetGroup",
         "label": "رابط المجموعة الخاصة",
         "type": "text",
-        "placeholder": "",
+        "placeholder": "https://t.me/+abc",
         "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء",
+        "type": "number",
+        "placeholder": "100",
+        "required": false,
+        "default": 100
       }
     ],
     "pyFn": "pvthiddenscraper()",
@@ -617,11 +656,19 @@ export const COMMANDS: Command[] = [
     "fields": [
       {
         "name": "groups",
-        "label": "قائمة المجموعات",
+        "label": "قائمة المجموعات (سطر لكل رابط)",
         "type": "textarea",
-        "placeholder": "",
+        "placeholder": "@group1\n@group2\nhttps://t.me/+abc...",
         "required": true,
         "helper": "سطر لكل رابط"
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء لكل مجموعة",
+        "type": "number",
+        "placeholder": "100",
+        "required": false,
+        "default": 100
       }
     ],
     "pyFn": "multi_ccraper()",
@@ -635,7 +682,23 @@ export const COMMANDS: Command[] = [
     "category": "scrapers",
     "icon": "ScanLine",
     "description": "استخراج كامل: أعضاء، إدمنين، بوتات، معلومات تفصيلية.",
-    "fields": [],
+    "fields": [
+      {
+        "name": "groupLink",
+        "label": "رابط المجموعة",
+        "type": "text",
+        "placeholder": "@username",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء",
+        "type": "number",
+        "placeholder": "200",
+        "required": false,
+        "default": 200
+      }
+    ],
     "pyFn": "fullscraper()",
     "risk": "low"
   },
@@ -647,7 +710,23 @@ export const COMMANDS: Command[] = [
     "category": "scrapers",
     "icon": "Crown",
     "description": "استخراج الأعضاء المشتركين في تيليجرام بريميوم فقط.",
-    "fields": [],
+    "fields": [
+      {
+        "name": "groupLink",
+        "label": "رابط المجموعة",
+        "type": "text",
+        "placeholder": "@username",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء",
+        "type": "number",
+        "placeholder": "200",
+        "required": false,
+        "default": 200
+      }
+    ],
     "pyFn": "premiumscraper()",
     "risk": "low"
   },
@@ -885,14 +964,30 @@ export const COMMANDS: Command[] = [
     "nameEn": "Direct Adder",
     "category": "adders",
     "icon": "UserPlus",
-    "description": "إضافة أعضاء مباشرة من ملف CSV إلى مجموعة مستهدفة.",
+    "description": "إضافة أعضاء مباشرة من قائمة (CSV) إلى مجموعة مستهدفة.",
     "fields": [
       {
         "name": "inputFile",
-        "label": "ملف الأعضاء",
+        "label": "قائمة الأعضاء (id|access_hash|first_name|last_name|username)",
         "type": "textarea",
-        "placeholder": "",
+        "placeholder": "123456789|hash|ahmed|mohamed|@username",
+        "required": true,
+        "helper": "سطر لكل عضو — يمكن نسخه من نتائج السحب"
+      },
+      {
+        "name": "targetGroup",
+        "label": "رابط المجموعة الهدف",
+        "type": "text",
+        "placeholder": "@username أو https://t.me/+abc",
         "required": true
+      },
+      {
+        "name": "delay",
+        "label": "التأخير بين الإضافات (ثواني)",
+        "type": "number",
+        "placeholder": "3",
+        "required": false,
+        "default": 3
       }
     ],
     "pyFn": "directadder()",
@@ -905,8 +1000,39 @@ export const COMMANDS: Command[] = [
     "nameEn": "Public Adder",
     "category": "adders",
     "icon": "UserPlus",
-    "description": "إضافة أعضاء من مجموعة عامة إلى مجموعة أخرى.",
-    "fields": [],
+    "description": "إضافة أعضاء من مجموعة عامة (المصدر) إلى مجموعة أخرى (الهدف).",
+    "fields": [
+      {
+        "name": "sourceGroup",
+        "label": "رابط المجموعة المصدر",
+        "type": "text",
+        "placeholder": "@source_group",
+        "required": true
+      },
+      {
+        "name": "targetGroup",
+        "label": "رابط المجموعة الهدف",
+        "type": "text",
+        "placeholder": "@target_group",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء",
+        "type": "number",
+        "placeholder": "50",
+        "required": false,
+        "default": 50
+      },
+      {
+        "name": "delay",
+        "label": "التأخير (ثواني)",
+        "type": "number",
+        "placeholder": "3",
+        "required": false,
+        "default": 3
+      }
+    ],
     "pyFn": "adder()",
     "risk": "high"
   },
@@ -944,14 +1070,30 @@ export const COMMANDS: Command[] = [
     "nameEn": "Single Account Adder",
     "category": "adders",
     "icon": "UserPlus",
-    "description": "إضافة الأعضاء باستخدام حساب واحد فقط.",
+    "description": "إضافة الأعضاء باستخدام حساب واحد فقط من قائمة جاهزة.",
     "fields": [
       {
         "name": "inputFile",
-        "label": "ملف الأعضاء",
+        "label": "قائمة الأعضاء (CSV)",
         "type": "textarea",
-        "placeholder": "",
+        "placeholder": "123456789|hash|ahmed||@username",
+        "required": true,
+        "helper": "id|access_hash|first_name|last_name|username"
+      },
+      {
+        "name": "targetGroup",
+        "label": "رابط المجموعة الهدف",
+        "type": "text",
+        "placeholder": "@username",
         "required": true
+      },
+      {
+        "name": "delay",
+        "label": "التأخير (ثواني)",
+        "type": "number",
+        "placeholder": "3",
+        "required": false,
+        "default": 3
       }
     ],
     "pyFn": "adderrr()",
@@ -968,10 +1110,33 @@ export const COMMANDS: Command[] = [
     "fields": [
       {
         "name": "inputFile",
-        "label": "ملف الأعضاء",
+        "label": "قائمة الأعضاء (CSV)",
         "type": "textarea",
-        "placeholder": "",
+        "placeholder": "123456789|hash|ahmed||@username",
         "required": true
+      },
+      {
+        "name": "targetGroup",
+        "label": "رابط المجموعة الهدف",
+        "type": "text",
+        "placeholder": "@username",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء للإضافة",
+        "type": "number",
+        "placeholder": "50",
+        "required": false,
+        "default": 50
+      },
+      {
+        "name": "delay",
+        "label": "التأخير (ثواني)",
+        "type": "number",
+        "placeholder": "3",
+        "required": false,
+        "default": 3
       }
     ],
     "pyFn": "sunguleadder()",
@@ -984,8 +1149,39 @@ export const COMMANDS: Command[] = [
     "nameEn": "Single Filter Adder",
     "category": "adders",
     "icon": "Filter",
-    "description": "إضافة بعد تطبيق فلتر واحد (يومي/أسبوعي/شهري).",
-    "fields": [],
+    "description": "إضافة من مصدر إلى هدف بعد تطبيق فلتر النشاط.",
+    "fields": [
+      {
+        "name": "sourceGroup",
+        "label": "رابط المصدر",
+        "type": "text",
+        "placeholder": "@source_group",
+        "required": true
+      },
+      {
+        "name": "targetGroup",
+        "label": "رابط الهدف",
+        "type": "text",
+        "placeholder": "@target_group",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء",
+        "type": "number",
+        "placeholder": "50",
+        "required": false,
+        "default": 50
+      },
+      {
+        "name": "delay",
+        "label": "التأخير (ثواني)",
+        "type": "number",
+        "placeholder": "3",
+        "required": false,
+        "default": 3
+      }
+    ],
     "pyFn": "singlefilteradderrr()",
     "risk": "high"
   },
@@ -997,7 +1193,38 @@ export const COMMANDS: Command[] = [
     "category": "adders",
     "icon": "Filter",
     "description": "إضافة مع تطبيق فلتر النشاط قبل الإضافة.",
-    "fields": [],
+    "fields": [
+      {
+        "name": "sourceGroup",
+        "label": "رابط المصدر",
+        "type": "text",
+        "placeholder": "@source_group",
+        "required": true
+      },
+      {
+        "name": "targetGroup",
+        "label": "رابط الهدف",
+        "type": "text",
+        "placeholder": "@target_group",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء",
+        "type": "number",
+        "placeholder": "50",
+        "required": false,
+        "default": 50
+      },
+      {
+        "name": "delay",
+        "label": "التأخير (ثواني)",
+        "type": "number",
+        "placeholder": "3",
+        "required": false,
+        "default": 3
+      }
+    ],
     "pyFn": "filterwalaadder()",
     "risk": "high"
   },
@@ -1011,11 +1238,34 @@ export const COMMANDS: Command[] = [
     "description": "إضافة متقدمة بنظام Ramex (دورات متعددة بحسابات متعددة).",
     "fields": [
       {
-        "name": "phonesList",
-        "label": "ملف الحسابات",
-        "type": "textarea",
-        "placeholder": "",
+        "name": "sourceGroup",
+        "label": "رابط المصدر",
+        "type": "text",
+        "placeholder": "@source_group",
         "required": true
+      },
+      {
+        "name": "targetGroup",
+        "label": "رابط الهدف",
+        "type": "text",
+        "placeholder": "@target_group",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء",
+        "type": "number",
+        "placeholder": "50",
+        "required": false,
+        "default": 50
+      },
+      {
+        "name": "delay",
+        "label": "التأخير (ثواني)",
+        "type": "number",
+        "placeholder": "5",
+        "required": false,
+        "default": 5
       }
     ],
     "pyFn": "ramexadder()",
@@ -1028,8 +1278,39 @@ export const COMMANDS: Command[] = [
     "nameEn": "Hidden Adder",
     "category": "adders",
     "icon": "UserPlus",
-    "description": "إضافة الأعضاء المخفيين من مجموعة المصدر.",
-    "fields": [],
+    "description": "إضافة الأعضاء المخفيين من مجموعة المصدر إلى الهدف.",
+    "fields": [
+      {
+        "name": "sourceGroup",
+        "label": "رابط المصدر",
+        "type": "text",
+        "placeholder": "@source_group",
+        "required": true
+      },
+      {
+        "name": "targetGroup",
+        "label": "رابط الهدف",
+        "type": "text",
+        "placeholder": "@target_group",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء",
+        "type": "number",
+        "placeholder": "50",
+        "required": false,
+        "default": 50
+      },
+      {
+        "name": "delay",
+        "label": "التأخير (ثواني)",
+        "type": "number",
+        "placeholder": "3",
+        "required": false,
+        "default": 3
+      }
+    ],
     "pyFn": "hiddenadder()",
     "risk": "high"
   },
@@ -1043,11 +1324,26 @@ export const COMMANDS: Command[] = [
     "description": "إضافة Ramex مع فلتر النشاط اليومي.",
     "fields": [
       {
-        "name": "phonesList",
-        "label": "ملف الحسابات",
-        "type": "textarea",
-        "placeholder": "",
+        "name": "sourceGroup",
+        "label": "رابط المصدر",
+        "type": "text",
+        "placeholder": "@source_group",
         "required": true
+      },
+      {
+        "name": "targetGroup",
+        "label": "رابط الهدف",
+        "type": "text",
+        "placeholder": "@target_group",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء",
+        "type": "number",
+        "placeholder": "50",
+        "required": false,
+        "default": 50
       }
     ],
     "pyFn": "ramexdaily()",
@@ -1063,11 +1359,26 @@ export const COMMANDS: Command[] = [
     "description": "إضافة Ramex مع فلتر النشاط الأسبوعي.",
     "fields": [
       {
-        "name": "phonesList",
-        "label": "ملف الحسابات",
-        "type": "textarea",
-        "placeholder": "",
+        "name": "sourceGroup",
+        "label": "رابط المصدر",
+        "type": "text",
+        "placeholder": "@source_group",
         "required": true
+      },
+      {
+        "name": "targetGroup",
+        "label": "رابط الهدف",
+        "type": "text",
+        "placeholder": "@target_group",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء",
+        "type": "number",
+        "placeholder": "50",
+        "required": false,
+        "default": 50
       }
     ],
     "pyFn": "ramexweekly()",
@@ -1083,11 +1394,26 @@ export const COMMANDS: Command[] = [
     "description": "إضافة Ramex مع فلتر النشاط الشهري.",
     "fields": [
       {
-        "name": "phonesList",
-        "label": "ملف الحسابات",
-        "type": "textarea",
-        "placeholder": "",
+        "name": "sourceGroup",
+        "label": "رابط المصدر",
+        "type": "text",
+        "placeholder": "@source_group",
         "required": true
+      },
+      {
+        "name": "targetGroup",
+        "label": "رابط الهدف",
+        "type": "text",
+        "placeholder": "@target_group",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء",
+        "type": "number",
+        "placeholder": "50",
+        "required": false,
+        "default": 50
       }
     ],
     "pyFn": "ramexmonthly()",
@@ -1103,11 +1429,26 @@ export const COMMANDS: Command[] = [
     "description": "إضافة Ramex للأعضاء المتصلين حاليًا.",
     "fields": [
       {
-        "name": "phonesList",
-        "label": "ملف الحسابات",
-        "type": "textarea",
-        "placeholder": "",
+        "name": "sourceGroup",
+        "label": "رابط المصدر",
+        "type": "text",
+        "placeholder": "@source_group",
         "required": true
+      },
+      {
+        "name": "targetGroup",
+        "label": "رابط الهدف",
+        "type": "text",
+        "placeholder": "@target_group",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء",
+        "type": "number",
+        "placeholder": "50",
+        "required": false,
+        "default": 50
       }
     ],
     "pyFn": "ramexonline()",
@@ -1123,11 +1464,26 @@ export const COMMANDS: Command[] = [
     "description": "إضافة Ramex للأعضاء غير النشطين.",
     "fields": [
       {
-        "name": "phonesList",
-        "label": "ملف الحسابات",
-        "type": "textarea",
-        "placeholder": "",
+        "name": "sourceGroup",
+        "label": "رابط المصدر",
+        "type": "text",
+        "placeholder": "@source_group",
         "required": true
+      },
+      {
+        "name": "targetGroup",
+        "label": "رابط الهدف",
+        "type": "text",
+        "placeholder": "@target_group",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء",
+        "type": "number",
+        "placeholder": "50",
+        "required": false,
+        "default": 50
       }
     ],
     "pyFn": "ramexnonactive()",
@@ -1140,8 +1496,31 @@ export const COMMANDS: Command[] = [
     "nameEn": "Male Adder",
     "category": "adders",
     "icon": "UserPlus",
-    "description": "إضافة الأعضاء الذكور فقط (يعتمد على تحليل الاسم).",
-    "fields": [],
+    "description": "إضافة الأعضاء الذكور فقط من مصدر إلى هدف (يعتمد على تحليل الاسم).",
+    "fields": [
+      {
+        "name": "sourceGroup",
+        "label": "رابط المصدر",
+        "type": "text",
+        "placeholder": "@source_group",
+        "required": true
+      },
+      {
+        "name": "targetGroup",
+        "label": "رابط الهدف",
+        "type": "text",
+        "placeholder": "@target_group",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء",
+        "type": "number",
+        "placeholder": "50",
+        "required": false,
+        "default": 50
+      }
+    ],
     "pyFn": "maleadderh()",
     "risk": "medium"
   },
@@ -1152,8 +1531,31 @@ export const COMMANDS: Command[] = [
     "nameEn": "Female Adder",
     "category": "adders",
     "icon": "UserPlus",
-    "description": "إضافة الأعضاء الإناث فقط (يعتمد على تحليل الاسم).",
-    "fields": [],
+    "description": "إضافة الأعضاء الإناث فقط من مصدر إلى هدف (يعتمد على تحليل الاسم).",
+    "fields": [
+      {
+        "name": "sourceGroup",
+        "label": "رابط المصدر",
+        "type": "text",
+        "placeholder": "@source_group",
+        "required": true
+      },
+      {
+        "name": "targetGroup",
+        "label": "رابط الهدف",
+        "type": "text",
+        "placeholder": "@target_group",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء",
+        "type": "number",
+        "placeholder": "50",
+        "required": false,
+        "default": 50
+      }
+    ],
     "pyFn": "femaleadderh()",
     "risk": "medium"
   },
