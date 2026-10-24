@@ -61,6 +61,60 @@ export default function Home() {
     // باقي أوامر category=login (مثل accountinfogetter, changeraccount, banfilter, etc.) تتطلب حساب
     const LOGIN_CREATE_ONLY = ["login", "loginbycsv", "logintypeone", "logintypetwo"];
     const isLoginCreateCmd = selectedCommand.category === "login" && LOGIN_CREATE_ONLY.includes(selectedCommand.key);
+
+    // 🎯 أوامر السحب: استخدم /api/scrape-multi (متعدد الحسابات)
+    if (selectedCommand.category === "scrapers") {
+      const groupLink = formValues.groupLink || formValues.targetGroup || formValues.sourceGroup || "";
+      const count = Number(formValues.count || 100);
+      if (!groupLink) { setOutput("❌ أدخل رابط المجموعة"); return; }
+      setExecuting(true);
+      setOutput("⏳ جاري السحب بحسابات متعددة...");
+      try {
+        const res = await fetch("/api/scrape-multi", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ groupLink, count, rotateMode: "auto" }),
+        });
+        const data = await res.json();
+        setOutput(data.output || data.error || "تم");
+      } catch (e: any) { setOutput("❌ " + e.message); }
+      setExecuting(false);
+      return;
+    }
+
+    // 🎯 أوامر الإضافة: استخدم /api/add-multi (متعدد الحسابات + rotation)
+    if (selectedCommand.category === "adders") {
+      const targetGroup = formValues.targetGroup || "";
+      const sourceGroup = formValues.sourceGroup || "";
+      const userList = formValues.userList || formValues.inputFile || formValues.membersList || formValues.phonesList || "";
+      const count = Number(formValues.count || 50);
+      const delay = Number(formValues.delay || 3);
+      if (!targetGroup) { setOutput("❌ أدخل رابط المجموعة الهدف"); return; }
+      if (!sourceGroup && !userList) { setOutput("❌ أدخل مصدراً أو قائمة مستخدمين"); return; }
+      setExecuting(true);
+      setOutput("⏳ جاري الإضافة بحسابات متعددة...");
+      try {
+        const res = await fetch("/api/add-multi", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            targetGroup,
+            sourceGroup: sourceGroup || undefined,
+            userList: userList || undefined,
+            count,
+            delay,
+            rotateMode: "auto",
+            switchOnError: 3,
+            switchOnFlood: true,
+          }),
+        });
+        const data = await res.json();
+        setOutput(data.output || data.error || "تم");
+      } catch (e: any) { setOutput("❌ " + e.message); }
+      setExecuting(false);
+      return;
+    }
+
     if (!isLoginCreateCmd && !selectedAccount) {
       setOutput("❌ اختر حساباً أولاً");
       return;
@@ -176,6 +230,7 @@ export default function Home() {
           />
           <div className="flex items-center gap-2 shrink-0">
             <a href="/accounts" className="text-sm text-neutral-400 hover:text-amber-500">📱</a>
+            <a href="/multi-accounts" className="text-sm text-neutral-400 hover:text-amber-500">👥</a>
             <a href="/blacklist" className="text-sm text-neutral-400 hover:text-amber-500">🚫</a>
             <a href="/subscription" className="text-sm text-neutral-400 hover:text-amber-500">💳</a>
             {user?.role === "admin" && <a href="/admin" className="text-sm text-neutral-400 hover:text-amber-500">⚙️</a>}
@@ -324,8 +379,11 @@ export default function Home() {
             ) : (
               <>
                 {/* ─── Normal command execution ─── */}
-                {/* Account — مخفي فقط لأوامر "إنشاء حساب جديد" (login, loginbycsv, logintypeone, logintypetwo) */}
-                {!(selectedCommand.category === "login" && ["login", "loginbycsv", "logintypeone", "logintypetwo"].includes(selectedCommand.key)) && (
+                {/* Account — مخفي لأوامر السحب والإضافة (تستخدم multi-account تلقائياً)
+                    ولأوامر "إنشاء حساب جديد" (login, loginbycsv, logintypeone, logintypetwo) */}
+                {!(selectedCommand.category === "login" && ["login", "loginbycsv", "logintypeone", "logintypetwo"].includes(selectedCommand.key))
+                  && selectedCommand.category !== "scrapers"
+                  && selectedCommand.category !== "adders" && (
                   <div className="bg-[#141414] border border-[#1a1a1a] rounded-2xl p-4 mb-4">
                     <label className="block text-sm text-neutral-400 mb-2">📱 الحساب</label>
                     {accounts.length === 0 ? (
@@ -343,6 +401,18 @@ export default function Home() {
                 {selectedCommand.category === "login" && ["login", "loginbycsv", "logintypeone", "logintypetwo"].includes(selectedCommand.key) && (
                   <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-3 mb-4 text-xs text-amber-300/80 leading-relaxed">
                     💡 هذا الأمر يُنشئ حساباً جديداً — لا حاجة لاختيار حساب موجود. املأ الحقول بالأسفل واضغط تنفيذ.
+                  </div>
+                )}
+
+                {/* تنبيه لأوامر السحب والإضافة: استخدام multi-account */}
+                {(selectedCommand.category === "scrapers" || selectedCommand.category === "adders") && (
+                  <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-3 mb-4 text-xs text-blue-300/80 leading-relaxed">
+                    👥 هذا الأمر يستخدم <strong>كل حساباتك تلقائياً</strong> مع rotation ذكي.
+                    {accounts.length === 0 ? (
+                      <span className="text-red-400 block mt-1">⚠️ لا يوجد حسابات — أضف حسابات من <a href="/multi-accounts" className="underline">صفحة الحسابات المتعددة</a></span>
+                    ) : (
+                      <span className="block mt-1">✓ سيستخدم {accounts.length} حساب — <a href="/multi-accounts" className="underline">إدارة الحسابات</a></span>
+                    )}
                   </div>
                 )}
 
@@ -386,7 +456,11 @@ export default function Home() {
 
                 <button
                   onClick={executeCommand}
-                  disabled={executing || !(selectedCommand.category === "login" && ["login", "loginbycsv", "logintypeone", "logintypetwo"].includes(selectedCommand.key)) && !selectedAccount}
+                  disabled={executing
+                    || !(selectedCommand.category === "login" && ["login", "loginbycsv", "logintypeone", "logintypetwo"].includes(selectedCommand.key))
+                       && selectedCommand.category !== "scrapers"
+                       && selectedCommand.category !== "adders"
+                       && !selectedAccount}
                   className="w-full bg-amber-500 text-black font-bold rounded-xl py-3 hover:bg-amber-400 transition-colors disabled:opacity-50 active:scale-[0.98] mb-4">
                   {executing ? "⏳ جاري التنفيذ..." : "⚡ تنفيذ الأمر"}
                 </button>
@@ -410,6 +484,7 @@ export default function Home() {
             <span className="text-lg">🏠</span><span className="text-[10px] text-neutral-400">الرئيسية</span>
           </button>
           <a href="/accounts" className="flex flex-col items-center gap-0.5 px-2 py-1"><span className="text-lg">📱</span><span className="text-[10px] text-neutral-400">حسابات</span></a>
+          <a href="/multi-accounts" className="flex flex-col items-center gap-0.5 px-2 py-1"><span className="text-lg">👥</span><span className="text-[10px] text-neutral-400">متعدد</span></a>
           <a href="/blacklist" className="flex flex-col items-center gap-0.5 px-2 py-1"><span className="text-lg">🚫</span><span className="text-[10px] text-neutral-400">سوداء</span></a>
           <a href="/subscription" className="flex flex-col items-center gap-0.5 px-2 py-1"><span className="text-lg">💳</span><span className="text-[10px] text-neutral-400">اشتراك</span></a>
           <button onClick={logout} className="flex flex-col items-center gap-0.5 px-2 py-1"><span className="text-lg">🚪</span><span className="text-[10px] text-neutral-400">خروج</span></button>
