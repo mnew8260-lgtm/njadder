@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema, BlacklistService } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { buildClient, scrapeGroupMembers, addSingleMember, smartDelay, resolveChannelEntity } from "@/lib/telegram";
+import {
+  buildClient, scrapeGroupMembers, addSingleMember, smartDelay, resolveChannelEntity,
+  addContact, deleteContacts, smartContactRecycle,
+  scrapeHiddenMembers, scrapeWithFilters, filterByStatus,
+  checkSpamBotStatus, submitSpamBotComplaint,
+  sendToMultipleGroups, forwardMessages, sendReaction, incrementViews,
+  hideLastSeen, hidePhoneNumber, setRandomUsername,
+  reportChannel, createSupergroup, getFullAccountInfo, getOTPMessages
+} from "@/lib/telegram";
 import { getCommandByKey, Command } from "@/lib/commands";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 
@@ -685,6 +693,368 @@ async function executeCommand(
     // ═══════════════════════════════════════════════════════
     if (cmd.category === "wrappers") {
       return { ok: true, output: `✓ ${cmd.nameAr} — جاهز` };
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // [139-155] SMART TOOLS (v41) — مُستوحاة من NJADDER v41
+    // ═══════════════════════════════════════════════════════
+    if (cmd.category === "smart") {
+      switch (cmd.key) {
+        case "smartunifiedadder": {
+          const source = params.sourceGroup || "";
+          const target = params.targetGroup || "";
+          const count = Number(params.count || 50);
+          const delay = Number(params.delay || 3);
+          if (!source || !target) return { ok: false, output: "المصدر والهدف مطلوبان" };
+
+          addLog(`🔗 حلّ المصدر: ${source}`);
+          let sourceEntity: any;
+          try {
+            sourceEntity = await resolveChannelEntity(client, source);
+            addLog(`✓ تم الوصول للمصدر`);
+          } catch (e: any) {
+            return { ok: false, output: `❌ تعذّر الوصول للمصدر: ${e.message?.substring(0, 100)}` };
+          }
+
+          addLog(`🎯 حلّ الهدف: ${target}`);
+          let targetEntity: any;
+          try {
+            targetEntity = await resolveChannelEntity(client, target);
+            addLog(`✓ تم الوصول للهدف`);
+          } catch (e: any) {
+            return { ok: false, output: `❌ تعذّر الوصول للهدف: ${e.message?.substring(0, 100)}` };
+          }
+
+          // كشف الاستراتيجية: members vs messages
+          addLog(`🔍 كشف الاستراتيجية...`);
+          let strategy = "members";
+          try {
+            const test = await client.getParticipants(sourceEntity, { limit: 5 } as any);
+            if (test.length > 0) {
+              strategy = "members";
+              addLog(`✓ استراتيجية: members (وصل لـ ${test.length} عضو)`);
+            } else {
+              strategy = "messages";
+              addLog(`⚠️ لا يوجد أعضاء ظاهرون — استراتيجية: messages`);
+            }
+          } catch {
+            strategy = "messages";
+            addLog(`⚠️ تعذّر سحب الأعضاء — استراتيجية: messages`);
+          }
+
+          // السحب
+          addLog(`📥 السحب (${strategy})...`);
+          let users: any[] = [];
+          if (strategy === "members") {
+            try {
+              users = await scrapeGroupMembers(client, source, count * 2);
+              users = users.filter(u => !u.is_bot && !u.is_deleted).slice(0, count);
+              addLog(`✓ سُحب ${users.length} عضو`);
+            } catch (e: any) {
+              addLog(`⚠️ فشل السحب العادي، نحاول بالرسائل: ${e.message?.substring(0, 60)}`);
+              try {
+                const result = await scrapeHiddenMembers(client, source, count);
+                users = result.members.filter(u => !u.is_bot && !u.is_deleted).slice(0, count);
+                addLog(`✓ سُحب ${users.length} من الرسائل`);
+              } catch (e2: any) {
+                return { ok: false, output: log.join("\n") + `\n\n❌ فشل كل طرق السحب: ${e2.message?.substring(0, 80)}` };
+              }
+            }
+          } else {
+            try {
+              const result = await scrapeHiddenMembers(client, source, count);
+              users = result.members.filter(u => !u.is_bot && !u.is_deleted).slice(0, count);
+              addLog(`✓ سُحب ${users.length} من الرسائل`);
+            } catch (e: any) {
+              return { ok: false, output: log.join("\n") + `\n\n❌ فشل السحب: ${e.message?.substring(0, 80)}` };
+            }
+          }
+
+          if (!users.length) return { ok: false, output: log.join("\n") + "\n\n❌ لا يوجد أعضاء" };
+
+          // فلترة القائمة السوداء
+          const blacklistSet = await BlacklistService.idSet(userId);
+          if (blacklistSet.size > 0) {
+            const before = users.length;
+            users = users.filter(u => !blacklistSet.has(String(u.id)));
+            addLog(`🚫 تخطّي ${before - users.length} من القائمة السوداء`);
+          }
+
+          // الإضافة
+          addLog(`➕ إضافة ${users.length} للهدف`);
+          let added = 0, skipped = 0, errors = 0;
+          const skipReasons: Record<string, number> = {};
+          for (const u of users) {
+            const result = await smartContactRecycle(client, targetEntity, u);
+            if (result.status === "added" || result.status === "ok") {
+              added++;
+              addLog(`✓ ${u.first_name || u.username || u.id}`);
+            } else if (result.status === "already") {
+              skipped++;
+            } else {
+              errors++;
+              const r = result.reason || "غير معروف";
+              skipReasons[r] = (skipReasons[r] || 0) + 1;
+            }
+            await smartDelay(delay);
+          }
+          addLog(`\n📊 ✓ ${added} أُضيف | ⊘ ${skipped} موجود | ❌ ${errors} خطأ`);
+          if (Object.keys(skipReasons).length > 0) {
+            addLog(`\n--- أسباب التخطّي ---`);
+            for (const [reason, c] of Object.entries(skipReasons).sort((a, b) => b[1] - a[1])) {
+              addLog(`  • ${reason}: ${c}`);
+            }
+          }
+          return { ok: true, output: log.join("\n") };
+        }
+
+        case "scrapehiddenmembers": {
+          const group = params.groupLink || "";
+          const count = Number(params.count || 100);
+          if (!group) return { ok: false, output: "رابط المجموعة مطلوب" };
+          addLog(`👻 السحب عبر الرسائل من: ${group}`);
+          try {
+            const result = await scrapeHiddenMembers(client, group, count);
+            addLog(`✓ سُحب ${result.members.length} عضو (آخر رسالة: ${result.lastMsgId})`);
+            const valid = result.members.filter(m => !m.is_bot && !m.is_deleted);
+            addLog(`📊 صالح: ${valid.length}`);
+            const csv = valid.map(m => `${m.id}|${m.access_hash}|${m.first_name}|${m.last_name}|${m.username}`).join("\n");
+            return { ok: true, output: log.join("\n") + "\n\n--- النتائج ---\n" + csv };
+          } catch (e: any) {
+            return { ok: false, output: log.join("\n") + `\n\n❌ ${e.message?.substring(0, 150)}` };
+          }
+        }
+
+        case "deepscrape": {
+          const group = params.groupLink || "";
+          const count = Number(params.count || 1000);
+          if (!group) return { ok: false, output: "رابط المجموعة مطلوب" };
+          addLog(`🔍 الاستخراج العميق بفلاتر A-Z من: ${group}`);
+          addLog(`🎯 الهدف: ${count} عضو`);
+          try {
+            const members = await scrapeWithFilters(client, group, count);
+            const valid = members.filter(m => !m.is_bot && !m.is_deleted);
+            addLog(`✓ سُحب ${members.length} | صالح: ${valid.length}`);
+            const csv = valid.map(m => `${m.id}|${m.access_hash}|${m.first_name}|${m.last_name}|${m.username}`).join("\n");
+            return { ok: true, output: log.join("\n") + "\n\n--- النتائج ---\n" + csv };
+          } catch (e: any) {
+            return { ok: false, output: log.join("\n") + `\n\n❌ ${e.message?.substring(0, 150)}` };
+          }
+        }
+
+        case "contactrecycle": {
+          const userList = params.userList || "";
+          const target = params.targetGroup || "";
+          const delay = Number(params.delay || 3);
+          if (!userList || !target) return { ok: false, output: "القائمة والهدف مطلوبان" };
+
+          let targetEntity: any;
+          try {
+            targetEntity = await resolveChannelEntity(client, target);
+            addLog(`✓ تم الوصول للهدف`);
+          } catch (e: any) {
+            return { ok: false, output: `❌ تعذّر الوصول للهدف: ${e.message?.substring(0, 100)}` };
+          }
+
+          const users = String(userList).split("\n").map((line: string) => {
+            const parts = line.split("|").map(p => p.trim());
+            return {
+              id: parts[0],
+              access_hash: parts[1] || "",
+              first_name: parts[2] || "",
+              last_name: parts[3] || "",
+              username: parts[4] || "",
+            };
+          }).filter((u: any) => u.id && /^\d+$/.test(u.id));
+
+          addLog(`📋 ${users.length} عضو — دورة جهة اتصال`);
+          let added = 0, errors = 0;
+          const skipReasons: Record<string, number> = {};
+          for (const u of users) {
+            const result = await smartContactRecycle(client, targetEntity, u);
+            if (result.status === "added" || result.status === "ok") {
+              added++;
+              addLog(`✓ ${u.first_name || u.id}`);
+            } else {
+              errors++;
+              const r = result.reason || "غير معروف";
+              skipReasons[r] = (skipReasons[r] || 0) + 1;
+            }
+            await smartDelay(delay);
+          }
+          addLog(`\n📊 ✓ ${added} أُضيف | ❌ ${errors} خطأ`);
+          if (Object.keys(skipReasons).length > 0) {
+            addLog(`\n--- أسباب التخطّي ---`);
+            for (const [reason, c] of Object.entries(skipReasons).sort((a, b) => b[1] - a[1])) {
+              addLog(`  • ${reason}: ${c}`);
+            }
+          }
+          return { ok: true, output: log.join("\n") };
+        }
+
+        case "multigroupsender": {
+          const groupsRaw = params.groups || "";
+          const message = params.message || "";
+          const count = Number(params.count || 1);
+          const delay = Number(params.delay || 3);
+          if (!groupsRaw || !message) return { ok: false, output: "المجموعات والرسالة مطلوبة" };
+
+          const groups = groupsRaw.split("\n").map((g: string) => g.trim()).filter(Boolean);
+          addLog(`📨 إرسال لـ ${groups.length} مجموعة × ${count} مرة`);
+          const result = await sendToMultipleGroups(client, groups, message, count, delay);
+          addLog(`\n📊 ✓ ${result.sent} رسالة مُرسلة`);
+          if (result.errors.length > 0) {
+            addLog(`\n--- أخطاء (${result.errors.length}) ---`);
+            addLog(result.errors.slice(0, 10).join("\n"));
+          }
+          return { ok: true, output: log.join("\n") };
+        }
+
+        case "forwardmessages": {
+          const source = params.sourceGroup || "";
+          const target = params.targetGroup || "";
+          const count = Number(params.count || 10);
+          if (!source || !target) return { ok: false, output: "المصدر والهدف مطلوبان" };
+          addLog(`🔄 إعادة توجيه ${count} رسالة من ${source} إلى ${target}`);
+          const result = await forwardMessages(client, source, target, count);
+          addLog(`\n📊 ✓ ${result.forwarded} رسالة مُعاد توجيهها`);
+          if (result.errors.length > 0) {
+            addLog(`\n--- أخطاء (${result.errors.length}) ---`);
+            addLog(result.errors.slice(0, 10).join("\n"));
+          }
+          return { ok: true, output: log.join("\n") };
+        }
+
+        case "sendreaction": {
+          const channel = params.groupLink || "";
+          const msgId = Number(params.messageId || 0);
+          const reaction = params.reaction || "👍";
+          if (!channel || !msgId) return { ok: false, output: "القناة وID الرسالة مطلوبان" };
+          const result = await sendReaction(client, channel, msgId, reaction);
+          return result.ok
+            ? { ok: true, output: `✓ تم إرسال التفاعل ${reaction}` }
+            : { ok: false, output: `❌ ${result.error}` };
+        }
+
+        case "incrementviews": {
+          const channel = params.groupLink || "";
+          const msgId = Number(params.messageId || 0);
+          if (!channel || !msgId) return { ok: false, output: "القناة وID الرسالة مطلوبان" };
+          const result = await incrementViews(client, channel, msgId);
+          return result.ok
+            ? { ok: true, output: "✓ تم زيادة المشاهدات" }
+            : { ok: false, output: `❌ ${result.error}` };
+        }
+
+        case "hideseen": {
+          const result = await hideLastSeen(client);
+          return result.ok
+            ? { ok: true, output: "✓ تم إخفاء آخر ظهور" }
+            : { ok: false, output: `❌ ${result.error}` };
+        }
+
+        case "hidephone": {
+          const result = await hidePhoneNumber(client);
+          return result.ok
+            ? { ok: true, output: "✓ تم إخفاء رقم الهاتف" }
+            : { ok: false, output: `❌ ${result.error}` };
+        }
+
+        case "randomusername": {
+          const result = await setRandomUsername(client);
+          return result.ok
+            ? { ok: true, output: `✓ تم تعيين اليوزر: @${result.username}` }
+            : { ok: false, output: `❌ ${result.error}` };
+        }
+
+        case "spambotcheck": {
+          addLog("🤖 فحص حالة الحساب عبر @SpamBot...");
+          const status = await checkSpamBotStatus(client);
+          const statusText = status === "clean" ? "✅ نظيف — لا قيود"
+            : status === "restricted" ? "⚠️ مقيّد"
+            : status === "banned" ? "🚫 محظور"
+            : "❓ غير معروف";
+          addLog(`الحالة: ${statusText}`);
+          return { ok: true, output: log.join("\n") };
+        }
+
+        case "spambotrecover": {
+          addLog("📝 إرسال شكوى لرفع القيد...");
+          const success = await submitSpamBotComplaint(client);
+          addLog(success ? "✓ تم إرسال الشكوى — راجع بعد 24-48 ساعة" : "⚠️ تعذّر إرسال الشكوى");
+          return { ok: true, output: log.join("\n") };
+        }
+
+        case "reportchannel": {
+          const channel = params.groupLink || "";
+          const msgId = Number(params.messageId || 0);
+          const reasonType = params.reasonType || "spam";
+          const reportMessage = params.reportMessage || "Report";
+          if (!channel || !msgId) return { ok: false, output: "القناة وID المنشور مطلوبان" };
+          const result = await reportChannel(client, channel, msgId, reasonType, reportMessage);
+          return result.ok
+            ? { ok: true, output: `✓ تم إرسال البلاغ (${reasonType})` }
+            : { ok: false, output: `❌ ${result.error}` };
+        }
+
+        case "creategroup": {
+          const name = params.groupName || "";
+          const about = params.about || "";
+          if (!name) return { ok: false, output: "اسم المجموعة مطلوب" };
+          const result = await createSupergroup(client, name, about);
+          return result.ok
+            ? { ok: true, output: `✓ تم إنشاء المجموعة: ${name} (ID: ${result.channelId})` }
+            : { ok: false, output: `❌ ${result.error}` };
+        }
+
+        case "getotp": {
+          const count = Number(params.count || 3);
+          addLog(`📩 قراءة آخر ${count} رسائل OTP...`);
+          try {
+            const msgs = await getOTPMessages(client, count);
+            if (msgs.length === 0) {
+              addLog("📭 لا توجد رسائل OTP");
+            } else {
+              addLog(`✓ ${msgs.length} رسالة:`);
+              for (const m of msgs) {
+                addLog(`\n--- ${m.date} ---\n${m.text}`);
+              }
+            }
+            return { ok: true, output: log.join("\n") };
+          } catch (e: any) {
+            return { ok: false, output: `❌ ${e.message?.substring(0, 100)}` };
+          }
+        }
+
+        case "fullaccountinfo": {
+          try {
+            const info = await getFullAccountInfo(client);
+            const lines = [
+              "📊 معلومات الحساب الكاملة",
+              "━━━━━━━━━━━━━━━━━━",
+              `🆔 ID: ${info.id}`,
+              `👤 الاسم: ${info.first_name} ${info.last_name}`,
+              `📛 اليوزر: @${info.username || "لا يوجد"}`,
+              `📱 الهاتف: ${info.phone || "لا يوجد"}`,
+              `⭐ Premium: ${info.is_premium ? "نعم" : "لا"}`,
+              `✓ Verified: ${info.is_verified ? "نعم" : "لا"}`,
+              `🚫 Scam: ${info.is_scam ? "نعم" : "لا"}`,
+              `🎭 Fake: ${info.is_fake ? "نعم" : "لا"}`,
+              `🤖 Bot: ${info.is_bot ? "نعم" : "لا"}`,
+              `🗑️ Deleted: ${info.is_deleted ? "نعم" : "لا"}`,
+              `📷 Photo: ${info.photo}`,
+              `🟢 Status: ${info.status}`,
+              info.last_online_date ? `⏰ Last Online: ${info.last_online_date}` : "",
+            ].filter(Boolean);
+            return { ok: true, output: lines.join("\n") };
+          } catch (e: any) {
+            return { ok: false, output: `❌ ${e.message?.substring(0, 100)}` };
+          }
+        }
+
+        default:
+          return { ok: true, output: `✓ تم تنفيذ: ${cmd.nameAr}` };
+      }
     }
 
     // ═══════════════════════════════════════════════════════

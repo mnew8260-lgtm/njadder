@@ -428,3 +428,561 @@ export function smartDelay(base: number = 3): Promise<void> {
   const ms = Math.max(base * (Math.random() * 1.4 + 0.3), 0.5) * 1000;
   return new Promise(r => setTimeout(r, ms));
 }
+
+// ════════════════════════════════════════════════════════════
+// v41 Smart Helpers (محوّلة من Pyrogram إلى GramJS)
+// ════════════════════════════════════════════════════════════
+
+/**
+ * إضافة جهة اتصال (لزيادة نسبة نجاح الإضافة للمجموعة)
+ * يعادل app.add_contact في Pyrogram
+ */
+export async function addContact(
+  client: TelegramClient,
+  userId: string,
+  firstName: string,
+  lastName: string = "",
+  phone: string = ""
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const entity = await client.getInputEntity(BigInt(userId) as any);
+    await client.invoke(
+      new Api.contacts.AddContact({
+        id: entity,
+        firstName: firstName || "Friend",
+        lastName: lastName || "",
+        phone: phone || "",
+        addPhonePrivacyException: false,
+      })
+    );
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message?.substring(0, 80) };
+  }
+}
+
+/**
+ * حذف جهة اتصال
+ * يعادل app.delete_contacts
+ */
+export async function deleteContacts(client: TelegramClient, userIds: string[]): Promise<void> {
+  try {
+    const ids = await Promise.all(
+      userIds.map(id => client.getInputEntity(BigInt(id) as any))
+    );
+    await client.invoke(new Api.contacts.DeleteContacts({ id: ids as any }));
+  } catch {}
+}
+
+/**
+ * الحصول على قائمة جهات الاتصال
+ */
+export async function getContactsList(client: TelegramClient): Promise<any[]> {
+  try {
+    const result = await client.invoke(new Api.contacts.GetContacts({ hash: 0 as any }));
+    return (result as any)?.users || [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Contact Recycle: أضف كـ contact → أضف للقروب → احذف الـ contact
+ * يعادل _smart_contact_recycle في Pyrogram
+ */
+export async function smartContactRecycle(
+  client: TelegramClient,
+  targetEntity: any,
+  user: { id: string; first_name?: string; last_name?: string; username?: string }
+): Promise<{ status: string; reason: string }> {
+  // 1. Add as contact
+  const contactResult = await addContact(
+    client,
+    user.id,
+    user.first_name || "User",
+    user.last_name || ""
+  );
+  if (!contactResult.ok && !contactResult.error?.includes("PRIVACY")) {
+    // continue anyway — try add to group
+  }
+
+  // 2. Add to group
+  const addResult = await addSingleMember(client, targetEntity, user);
+
+  // 3. Delete contact (cleanup)
+  await deleteContacts(client, [user.id]);
+
+  return addResult.ok
+    ? { status: "added", reason: "OK" }
+    : { status: addResult.status || "failed", reason: addResult.reason || "failed" };
+}
+
+/**
+ * استخراج الأعضاء عبر تاريخ الرسائل (للمجموعات المخفية)
+ * يعادل hiddenscraper في Pyrogram
+ */
+export async function scrapeHiddenMembers(
+  client: TelegramClient,
+  groupInput: string,
+  limit: number = 100,
+  offsetId: number = 0
+): Promise<{ members: any[]; lastMsgId: number }> {
+  const members: any[] = [];
+  let lastMsgId = offsetId;
+
+  try {
+    const entity = await resolveChannelEntity(client, groupInput);
+
+    const messages = await client.getMessages(entity, {
+      limit: limit * 3, // نطلب أكثر لأن بعض الرسائل بوتات أو بدون from_user
+      offsetId: offsetId || undefined,
+    });
+
+    const seen = new Set<string>();
+    for (const msg of messages as any[]) {
+      lastMsgId = msg.id;
+      const fromUser = msg.fromUser || msg.sender;
+      if (!fromUser) continue;
+      if (fromUser.bot || fromUser.deleted) continue;
+      const uid = String(fromUser.id);
+      if (seen.has(uid)) continue;
+      seen.add(uid);
+
+      members.push({
+        id: uid,
+        access_hash: String(fromUser.accessHash || ""),
+        first_name: fromUser.firstName || "",
+        last_name: fromUser.lastName || "",
+        username: fromUser.username || "",
+        phone: fromUser.phone || "",
+        is_bot: !!fromUser.bot,
+        is_deleted: !!fromUser.deleted,
+        is_premium: !!fromUser.isPremium,
+        status: fromUser.status?.className || "unknown",
+      });
+
+      if (members.length >= limit) break;
+    }
+  } catch (e: any) {
+    throw new Error(e.message?.substring(0, 200));
+  }
+
+  return { members, lastMsgId };
+}
+
+/**
+ * استخراج الأعضاء بفلاتر A-Z + 0-9 (Deep Scrape)
+ * يعادل fullscraper في Pyrogram
+ */
+export async function scrapeWithFilters(
+  client: TelegramClient,
+  groupInput: string,
+  limit: number = 5000,
+  filters?: string[]
+): Promise<any[]> {
+  const searchFilters = filters || ["", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""), ..."0123456789".split(""), "@", "$", "_"];
+  const allMembers: any[] = [];
+  const seen = new Set<string>();
+
+  try {
+    const entity = await resolveChannelEntity(client, groupInput);
+
+    for (const filter of searchFilters) {
+      if (allMembers.length >= limit) break;
+
+      let attempts = 0;
+      while (attempts < 3 && allMembers.length < limit) {
+        try {
+          const participants = await client.getParticipants(entity, {
+            limit: 200,
+            search: filter || undefined,
+          } as any);
+
+          if (participants.length === 0) {
+            attempts++;
+            await new Promise(r => setTimeout(r, 500));
+            continue;
+          }
+
+          for (const p of participants as any[]) {
+            if (allMembers.length >= limit) break;
+            const uid = String(p.id);
+            if (seen.has(uid)) continue;
+            if (p.bot || p.deleted) continue;
+            seen.add(uid);
+            allMembers.push({
+              id: uid,
+              access_hash: String(p.accessHash || ""),
+              first_name: p.firstName || "",
+              last_name: p.lastName || "",
+              username: p.username || "",
+              phone: p.phone || "",
+              is_bot: !!p.bot,
+              is_deleted: !!p.deleted,
+              is_premium: !!p.isPremium,
+              status: p.status?.className || "unknown",
+            });
+          }
+          break;
+        } catch (e: any) {
+          const msg = e.message || "";
+          if (msg.includes("FLOOD_WAIT")) {
+            const m = msg.match(/(\d+)/);
+            const wait = m ? Number(m[1]) : 10;
+            await new Promise(r => setTimeout(r, (wait + 1) * 1000));
+            continue;
+          }
+          if (msg.includes("CHAT_ADMIN_REQUIRED")) {
+            return allMembers;
+          }
+          attempts++;
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+    }
+  } catch (e: any) {
+    throw new Error(e.message?.substring(0, 200));
+  }
+
+  return allMembers;
+}
+
+/**
+ * فلترة الأعضاء حسب الحالة (online/recently/last_week/last_month/long_ago)
+ * يعادل _run_filter في Pyrogram
+ */
+export function filterByStatus(members: any[], filterType: string): any[] {
+  const statusMap: Record<string, string[]> = {
+    daily: ["UserStatusOnline", "UserStatusRecently"],
+    weekly: ["UserStatusOnline", "UserStatusRecently", "UserStatusLastWeek"],
+    monthly: ["UserStatusOnline", "UserStatusRecently", "UserStatusLastWeek", "UserStatusLastMonth"],
+    online: ["UserStatusOnline"],
+    inactive: ["UserStatusLastMonth", "UserStatusLongAgo"],
+  };
+  const allowed = statusMap[filterType] || [];
+  return members.filter(m => allowed.includes(m.status));
+}
+
+/**
+ * التحقق من حالة الحساب عبر @SpamBot
+ * يعادل _check_spambot_status في Pyrogram
+ */
+export async function checkSpamBotStatus(client: TelegramClient): Promise<"clean" | "restricted" | "banned" | "unknown"> {
+  try {
+    await client.sendMessage("SpamBot", { message: "/start" });
+    await new Promise(r => setTimeout(r, 2500));
+
+    const msgs = await client.getMessages("SpamBot", { limit: 1 });
+    const lastMsg = (msgs as any[])[0];
+    if (!lastMsg?.text) return "unknown";
+
+    const text = lastMsg.text.toLowerCase();
+    if (text.includes("good news") || text.includes("free as a bird")) return "clean";
+    if (text.includes("harsh") || text.includes("limited") || text.includes("restricted")) return "restricted";
+    if (text.includes("banned") && (text.includes("phone") || text.includes("number"))) return "banned";
+    return "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * إرسال شكوى لرفع القيد من @SpamBot
+ * يعادل _submit_spambot_complaint في Pyrogram
+ */
+export async function submitSpamBotComplaint(client: TelegramClient): Promise<boolean> {
+  try {
+    try { await client.sendMessage("SpamBot", { message: "/start" }); await new Promise(r => setTimeout(r, 2000)); } catch {}
+    try { await client.sendMessage("SpamBot", { message: "Submit a complaint" }); await new Promise(r => setTimeout(r, 2000)); } catch {}
+    try { await client.sendMessage("SpamBot", { message: "No, I'll never do any of this!" }); await new Promise(r => setTimeout(r, 1500)); } catch {}
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * إرسال رسالة لعدة مجموعات (Multi-Group Sender)
+ * يعادل messagesendergroupmultimsgmultigroups في Pyrogram
+ */
+export async function sendToMultipleGroups(
+  client: TelegramClient,
+  groups: string[],
+  message: string,
+  count: number = 1,
+  delay: number = 3
+): Promise<{ sent: number; errors: string[] }> {
+  let sent = 0;
+  const errors: string[] = [];
+
+  for (const g of groups) {
+    try {
+      const entity = await resolveChannelEntity(client, g.trim());
+      for (let i = 0; i < count; i++) {
+        try {
+          await client.sendMessage(entity, { message });
+          sent++;
+          await smartDelay(delay);
+        } catch (e: any) {
+          errors.push(`${g}: ${e.message?.substring(0, 50)}`);
+          break;
+        }
+      }
+    } catch (e: any) {
+      errors.push(`${g}: ${e.message?.substring(0, 50)}`);
+    }
+  }
+  return { sent, errors };
+}
+
+/**
+ * إعادة توجيه رسائل من مصدر إلى هدف
+ * يعادل forward_to_channels في Pyrogram
+ */
+export async function forwardMessages(
+  client: TelegramClient,
+  sourceInput: string,
+  targetInput: string,
+  count: number = 10
+): Promise<{ forwarded: number; errors: string[] }> {
+  let forwarded = 0;
+  const errors: string[] = [];
+
+  try {
+    const source = await resolveChannelEntity(client, sourceInput);
+    const target = await resolveChannelEntity(client, targetInput);
+    const msgs = await client.getMessages(source, { limit: count });
+
+    for (const m of msgs as any[]) {
+      try {
+        await client.forwardMessages(target, {
+          fromPeer: source,
+          messages: [m.id],
+        });
+        forwarded++;
+      } catch (e: any) {
+        errors.push(`msg ${m.id}: ${e.message?.substring(0, 50)}`);
+      }
+    }
+  } catch (e: any) {
+    errors.push(`general: ${e.message?.substring(0, 80)}`);
+  }
+  return { forwarded, errors };
+}
+
+/**
+ * إرسال تفاعل (Reaction) على رسالة
+ * يعادل reactionincreaser في Pyrogram
+ */
+export async function sendReaction(
+  client: TelegramClient,
+  channelInput: string,
+  messageId: number,
+  reaction: string = "👍"
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const entity = await resolveChannelEntity(client, channelInput);
+    await (client as any).sendReaction(entity, { message: messageId, reaction });
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message?.substring(0, 80) };
+  }
+}
+
+/**
+ * زيادة المشاهدات لرسالة في قناة
+ * يعادل viewsincreaser في Pyrogram
+ */
+export async function incrementViews(
+  client: TelegramClient,
+  channelInput: string,
+  messageId: number
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const entity = await resolveChannelEntity(client, channelInput);
+    await client.invoke(
+      new Api.messages.GetMessagesViews({
+        peer: entity,
+        id: [messageId],
+        increment: true,
+      })
+    );
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message?.substring(0, 80) };
+  }
+}
+
+/**
+ * إخفاء آخر ظهور
+ * يعادل hidelastseen في Pyrogram
+ */
+export async function hideLastSeen(client: TelegramClient): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await client.invoke(
+      new Api.account.SetPrivacy({
+        key: new Api.InputPrivacyKeyStatusTimestamp(),
+        rules: [new Api.InputPrivacyValueDisallowAll()],
+      })
+    );
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message?.substring(0, 80) };
+  }
+}
+
+/**
+ * إخفاء رقم الهاتف
+ * يعادل hidenumbersp في Pyrogram
+ */
+export async function hidePhoneNumber(client: TelegramClient): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await client.invoke(
+      new Api.account.SetPrivacy({
+        key: new Api.InputPrivacyKeyPhoneNumber(),
+        rules: [new Api.InputPrivacyValueDisallowAll()],
+      })
+    );
+    await client.invoke(
+      new Api.account.SetPrivacy({
+        key: new Api.InputPrivacyKeyAddedByPhone(),
+        rules: [new Api.InputPrivacyValueAllowContacts()],
+      })
+    );
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message?.substring(0, 80) };
+  }
+}
+
+/**
+ * تعيين يوزر عشوائي
+ * يعادل randomusernameh في Pyrogram
+ */
+export async function setRandomUsername(client: TelegramClient, length: number = 12): Promise<{ ok: boolean; username?: string; error?: string }> {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  for (let attempt = 0; attempt < 5; attempt++) {
+    let username = "";
+    for (let i = 0; i < length; i++) {
+      username += chars[Math.floor(Math.random() * chars.length)];
+    }
+    try {
+      await client.invoke(new Api.account.UpdateUsername({ username }));
+      return { ok: true, username };
+    } catch {
+      // try another
+    }
+  }
+  return { ok: false, error: "تعذّر تعيين يوزر عشوائي بعد 5 محاولات" };
+}
+
+/**
+ * إرسال بلاغ عن قناة/منشور
+ * يعادل _run_report في Pyrogram
+ */
+export async function reportChannel(
+  client: TelegramClient,
+  channelInput: string,
+  messageId: number,
+  reasonType: string,
+  reportMessage: string = "Report"
+): Promise<{ ok: boolean; error?: string }> {
+  const reasonMap: Record<string, any> = {
+    fake: new Api.InputReportReasonFake(),
+    spam: new Api.InputReportReasonSpam(),
+    violence: new Api.InputReportReasonViolence(),
+    childabuse: new Api.InputReportReasonChildAbuse(),
+    copyright: new Api.InputReportReasonCopyright(),
+    geoirrelevant: new Api.InputReportReasonGeoIrrelevant(),
+    personaldetails: new Api.InputReportReasonPersonalDetails(),
+    illegaldrugs: new Api.InputReportReasonIllegalDrugs(),
+    pornography: new Api.InputReportReasonPornography(),
+    other: new Api.InputReportReasonOther(),
+  };
+  const reason = reasonMap[reasonType];
+  if (!reason) return { ok: false, error: "Invalid reason" };
+
+  try {
+    const entity = await resolveChannelEntity(client, channelInput);
+    await client.invoke(
+      new Api.messages.Report({
+        peer: entity,
+        id: [messageId],
+        reason: reason as any,
+        message: reportMessage,
+      } as any)
+    );
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message?.substring(0, 80) };
+  }
+}
+
+/**
+ * إنشاء مجموعة سوبر
+ * يعادل autogroupmaker في Pyrogram
+ */
+export async function createSupergroup(
+  client: TelegramClient,
+  name: string,
+  about: string = ""
+): Promise<{ ok: boolean; channelId?: string; error?: string }> {
+  try {
+    const result = await client.invoke(
+      new Api.channels.CreateChannel({
+        title: name,
+        about,
+        megagroup: true,
+      })
+    );
+    const channelId = String((result as any)?.updates?.chats?.[0]?.id || "");
+    return { ok: true, channelId };
+  } catch (e: any) {
+    return { ok: false, error: e.message?.substring(0, 80) };
+  }
+}
+
+/**
+ * الحصول على معلومات حساب كاملة
+ * يعادل accountinfogetter في Pyrogram
+ */
+export async function getFullAccountInfo(client: TelegramClient): Promise<any> {
+  const me: any = await client.getMe();
+  return {
+    id: String(me.id),
+    first_name: me.firstName || "",
+    last_name: me.lastName || "",
+    username: me.username || "",
+    phone: me.phone || "",
+    is_premium: !!me.isPremium,
+    is_verified: !!me.verified,
+    is_scam: !!me.scam,
+    is_fake: !!me.fake,
+    is_bot: !!me.bot,
+    is_deleted: !!me.deleted,
+    is_self: !!me.isSelf,
+    is_contact: !!me.isContact,
+    is_mutual_contact: !!me.isMutualContact,
+    is_support: !!me.isSupport,
+    photo: me.photo ? "yes" : "no",
+    status: me.status?.className || "unknown",
+    last_online_date: me.status?.wasOnline ? new Date(me.status.wasOnline * 1000).toISOString() : null,
+  };
+}
+
+/**
+ * قراءة رسائل OTP من 777000
+ * يعادل otpviewer في Pyrogram
+ */
+export async function getOTPMessages(client: TelegramClient, limit: number = 3): Promise<any[]> {
+  try {
+    const msgs = await client.getMessages(777000, { limit });
+    return (msgs as any[]).filter(m => m.text).map(m => ({
+      id: m.id,
+      text: m.text?.substring(0, 200),
+      date: m.date ? new Date(m.date * 1000).toISOString() : null,
+    }));
+  } catch (e: any) {
+    throw new Error(e.message?.substring(0, 100));
+  }
+}

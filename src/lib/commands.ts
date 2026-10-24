@@ -161,6 +161,15 @@ export const CATEGORIES: Category[] = [
     "accent": "#10b981",
     "range": "133-138",
     "order": 14
+  },
+  {
+    "key": "smart",
+    "nameAr": "🚀 الأدوات الذكية (v41)",
+    "nameEn": "Smart Tools v41",
+    "icon": "Zap",
+    "accent": "#f59e0b",
+    "range": "139-155",
+    "order": 15
   }
 ];
 
@@ -3366,6 +3375,446 @@ export const COMMANDS: Command[] = [
     "description": "إدارة شاملة لإعدادات البروكسي والتحقق من حالتها.",
     "fields": [],
     "pyFn": "proxymanager()",
+    "risk": "low"
+  },
+  // ═══════════════════════════════════════════════════════════════
+  // v41 SMART TOOLS — مُستوحاة من NJADDER v41
+  // ═══════════════════════════════════════════════════════════════
+  {
+    "id": 139,
+    "key": "smartunifiedadder",
+    "nameAr": "🚀 الإضافة الذكية الموحدة",
+    "nameEn": "Smart Unified Adder",
+    "category": "smart",
+    "icon": "Zap",
+    "description": "كشف تلقائي للاستراتيجية المثلى: members/messages/contacts. الأقوى على الإطلاق.",
+    "fields": [
+      {
+        "name": "sourceGroup",
+        "label": "رابط المصدر",
+        "type": "text",
+        "placeholder": "@source_group",
+        "required": true
+      },
+      {
+        "name": "targetGroup",
+        "label": "رابط الهدف (تتطلب أدمن)",
+        "type": "text",
+        "placeholder": "@target_group",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء لكل حساب",
+        "type": "number",
+        "placeholder": "50",
+        "required": false,
+        "default": 50
+      },
+      {
+        "name": "delay",
+        "label": "التأخير (ثواني)",
+        "type": "number",
+        "placeholder": "3",
+        "required": false,
+        "default": 3
+      }
+    ],
+    "pyFn": "smart_unified_adder()",
+    "risk": "high"
+  },
+  {
+    "id": 140,
+    "key": "scrapehiddenmembers",
+    "nameAr": "👻 استخراج الأعضاء المخفيين",
+    "nameEn": "Hidden Members Scraper v2",
+    "category": "smart",
+    "icon": "UserSearch",
+    "description": "استخراج الأعضاء عبر تاريخ الرسائل (للمجموعات المخفية) — أقوى من السحب العادي.",
+    "fields": [
+      {
+        "name": "groupLink",
+        "label": "رابط المجموعة",
+        "type": "text",
+        "placeholder": "@username",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء",
+        "type": "number",
+        "placeholder": "100",
+        "required": false,
+        "default": 100
+      }
+    ],
+    "pyFn": "scrape_hidden_members()",
+    "risk": "low"
+  },
+  {
+    "id": 141,
+    "key": "deepscrape",
+    "nameAr": "🔍 الاستخراج العميق بفلاتر A-Z",
+    "nameEn": "Deep Scrape A-Z",
+    "category": "smart",
+    "icon": "ScanLine",
+    "description": "استخراج كل الأعضاء بفلاتر A-Z + 0-9 — يكسر قيود الإخفاء.",
+    "fields": [
+      {
+        "name": "groupLink",
+        "label": "رابط المجموعة",
+        "type": "text",
+        "placeholder": "@username",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الأعضاء (حد أقصى 5000)",
+        "type": "number",
+        "placeholder": "1000",
+        "required": false,
+        "default": 1000
+      }
+    ],
+    "pyFn": "deep_scrape()",
+    "risk": "low"
+  },
+  {
+    "id": 142,
+    "key": "contactrecycle",
+    "nameAr": "♻️ إضافة بدورة جهة اتصال",
+    "nameEn": "Contact Recycle Adder",
+    "category": "smart",
+    "icon": "RefreshCw",
+    "description": "أضف كـ contact → أضف للمجموعة → احذف الـ contact. أعلى نسبة نجاح للإضافة.",
+    "fields": [
+      {
+        "name": "userList",
+        "label": "قائمة الأعضاء (CSV)",
+        "type": "textarea",
+        "placeholder": "123456789|hash|ahmed||@username",
+        "required": true
+      },
+      {
+        "name": "targetGroup",
+        "label": "رابط المجموعة الهدف",
+        "type": "text",
+        "placeholder": "@username",
+        "required": true
+      },
+      {
+        "name": "delay",
+        "label": "التأخير (ثواني)",
+        "type": "number",
+        "placeholder": "3",
+        "required": false,
+        "default": 3
+      }
+    ],
+    "pyFn": "contact_recycle()",
+    "risk": "high"
+  },
+  {
+    "id": 143,
+    "key": "multigroupsender",
+    "nameAr": "📨 إرسال لعدة مجموعات",
+    "nameEn": "Multi-Group Sender",
+    "category": "smart",
+    "icon": "Send",
+    "description": "إرسال رسالة لعدة مجموعات في عملية واحدة.",
+    "fields": [
+      {
+        "name": "groups",
+        "label": "قائمة المجموعات (سطر لكل رابط)",
+        "type": "textarea",
+        "placeholder": "@group1\n@group2\nhttps://t.me/+abc",
+        "required": true
+      },
+      {
+        "name": "message",
+        "label": "الرسالة",
+        "type": "textarea",
+        "placeholder": "اكتب رسالتك هنا...",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الإرسالات لكل مجموعة",
+        "type": "number",
+        "placeholder": "1",
+        "required": false,
+        "default": 1
+      },
+      {
+        "name": "delay",
+        "label": "التأخير (ثواني)",
+        "type": "number",
+        "placeholder": "3",
+        "required": false,
+        "default": 3
+      }
+    ],
+    "pyFn": "multi_group_sender()",
+    "risk": "medium"
+  },
+  {
+    "id": 144,
+    "key": "forwardmessages",
+    "nameAr": "🔄 إعادة توجيه الرسائل",
+    "nameEn": "Forward Messages",
+    "category": "smart",
+    "icon": "Forward",
+    "description": "إعادة توجيه آخر N رسالة من مصدر إلى هدف.",
+    "fields": [
+      {
+        "name": "sourceGroup",
+        "label": "رابط المصدر",
+        "type": "text",
+        "placeholder": "@source",
+        "required": true
+      },
+      {
+        "name": "targetGroup",
+        "label": "رابط الهدف",
+        "type": "text",
+        "placeholder": "@target",
+        "required": true
+      },
+      {
+        "name": "count",
+        "label": "عدد الرسائل",
+        "type": "number",
+        "placeholder": "10",
+        "required": false,
+        "default": 10
+      }
+    ],
+    "pyFn": "forward_messages()",
+    "risk": "low"
+  },
+  {
+    "id": 145,
+    "key": "sendreaction",
+    "nameAr": "👍 إرسال تفاعل",
+    "nameEn": "Send Reaction",
+    "category": "smart",
+    "icon": "ThumbsUp",
+    "description": "إرسال تفاعل على رسالة محددة.",
+    "fields": [
+      {
+        "name": "groupLink",
+        "label": "رابط القناة/المجموعة",
+        "type": "text",
+        "placeholder": "@channel",
+        "required": true
+      },
+      {
+        "name": "messageId",
+        "label": "ID الرسالة",
+        "type": "number",
+        "placeholder": "123",
+        "required": true
+      },
+      {
+        "name": "reaction",
+        "label": "التفاعل",
+        "type": "text",
+        "placeholder": "👍 ❤️ 🔥 🎉",
+        "required": false,
+        "default": "👍"
+      }
+    ],
+    "pyFn": "send_reaction()",
+    "risk": "low"
+  },
+  {
+    "id": 146,
+    "key": "incrementviews",
+    "nameAr": "👁️ زيادة المشاهدات",
+    "nameEn": "Increment Views",
+    "category": "smart",
+    "icon": "Eye",
+    "description": "زيادة عدد مشاهدات منشور في قناة.",
+    "fields": [
+      {
+        "name": "groupLink",
+        "label": "رابط القناة",
+        "type": "text",
+        "placeholder": "@channel",
+        "required": true
+      },
+      {
+        "name": "messageId",
+        "label": "ID الرسالة",
+        "type": "number",
+        "placeholder": "123",
+        "required": true
+      }
+    ],
+    "pyFn": "increment_views()",
+    "risk": "low"
+  },
+  {
+    "id": 147,
+    "key": "hideseen",
+    "nameAr": "🙈 إخفاء آخر ظهور",
+    "nameEn": "Hide Last Seen",
+    "category": "smart",
+    "icon": "EyeOff",
+    "description": "إخفاء آخر ظهور لكل الحسابات.",
+    "fields": [],
+    "pyFn": "hide_seen()",
+    "risk": "low"
+  },
+  {
+    "id": 148,
+    "key": "hidephone",
+    "nameAr": "📵 إخفاء رقم الهاتف",
+    "nameEn": "Hide Phone Number",
+    "category": "smart",
+    "icon": "PhoneOff",
+    "description": "إخفاء رقم الهاتف لكل الحسابات.",
+    "fields": [],
+    "pyFn": "hide_phone()",
+    "risk": "low"
+  },
+  {
+    "id": 149,
+    "key": "randomusername",
+    "nameAr": "🎲 يوزر عشوائي",
+    "nameEn": "Random Username",
+    "category": "smart",
+    "icon": "Dice",
+    "description": "تعيين يوزر عشوائي لكل الحسابات (12 حرف).",
+    "fields": [],
+    "pyFn": "random_username()",
+    "risk": "low"
+  },
+  {
+    "id": 150,
+    "key": "spambotcheck",
+    "nameAr": "🤖 فحص SpamBot",
+    "nameEn": "SpamBot Check",
+    "category": "smart",
+    "icon": "Bot",
+    "description": "فحص حالة الحساب عبر @SpamBot (clean/restricted/banned).",
+    "fields": [],
+    "pyFn": "spambot_check()",
+    "risk": "low"
+  },
+  {
+    "id": 151,
+    "key": "spambotrecover",
+    "nameAr": "📝 رفع قيد SpamBot",
+    "nameEn": "SpamBot Recover",
+    "category": "smart",
+    "icon": "ShieldCheck",
+    "description": "إرسال شكوى تلقائية لرفع القيد من @SpamBot.",
+    "fields": [],
+    "pyFn": "spambot_recover()",
+    "risk": "low"
+  },
+  {
+    "id": 152,
+    "key": "reportchannel",
+    "nameAr": "🚨 بلاغ قناة",
+    "nameEn": "Report Channel",
+    "category": "smart",
+    "icon": "Flag",
+    "description": "إرسال بلاغ عن قناة بـ 10 أنواع أسباب.",
+    "fields": [
+      {
+        "name": "groupLink",
+        "label": "رابط القناة",
+        "type": "text",
+        "placeholder": "@channel",
+        "required": true
+      },
+      {
+        "name": "messageId",
+        "label": "ID المنشور",
+        "type": "number",
+        "placeholder": "123",
+        "required": true
+      },
+      {
+        "name": "reasonType",
+        "label": "سبب البلاغ",
+        "type": "text",
+        "placeholder": "fake/spam/violence/copyright/other",
+        "required": true,
+        "default": "spam"
+      },
+      {
+        "name": "reportMessage",
+        "label": "رسالة البلاغ",
+        "type": "text",
+        "placeholder": "Report",
+        "required": false,
+        "default": "Report"
+      }
+    ],
+    "pyFn": "report_channel()",
+    "risk": "medium"
+  },
+  {
+    "id": 153,
+    "key": "creategroup",
+    "nameAr": "➕ إنشاء مجموعة",
+    "nameEn": "Create Group",
+    "category": "smart",
+    "icon": "PlusCircle",
+    "description": "إنشاء مجموعة سوبر جديدة.",
+    "fields": [
+      {
+        "name": "groupName",
+        "label": "اسم المجموعة",
+        "type": "text",
+        "placeholder": "My New Group",
+        "required": true
+      },
+      {
+        "name": "about",
+        "label": "الوصف (اختياري)",
+        "type": "text",
+        "placeholder": "",
+        "required": false
+      }
+    ],
+    "pyFn": "create_group()",
+    "risk": "low"
+  },
+  {
+    "id": 154,
+    "key": "getotp",
+    "nameAr": "📩 قراءة OTP",
+    "nameEn": "Get OTP",
+    "category": "smart",
+    "icon": "Mail",
+    "description": "قراءة آخر رسائل OTP من تيليجرام (777000).",
+    "fields": [
+      {
+        "name": "count",
+        "label": "عدد الرسائل",
+        "type": "number",
+        "placeholder": "3",
+        "required": false,
+        "default": 3
+      }
+    ],
+    "pyFn": "get_otp()",
+    "risk": "low"
+  },
+  {
+    "id": 155,
+    "key": "fullaccountinfo",
+    "nameAr": "📊 معلومات الحساب الكاملة",
+    "nameEn": "Full Account Info",
+    "category": "smart",
+    "icon": "Info",
+    "description": "عرض كل معلومات الحساب: ID، اسم، يوزر، هاتف، بريميوم، حالة، إلخ.",
+    "fields": [],
+    "pyFn": "full_account_info()",
     "risk": "low"
   }
 ];
