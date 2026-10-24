@@ -3,6 +3,7 @@ import { sql, ensureSchema, BlacklistService } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { buildClient, scrapeGroupMembers, addSingleMember, smartDelay } from "@/lib/telegram";
 import { getCommandByKey, Command } from "@/lib/commands";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -14,6 +15,16 @@ export async function POST(req: NextRequest) {
   // تأمين الموافقة
   if (user.role !== "admin" && user.status !== "approved") {
     return NextResponse.json({ ok: false, error: "حسابك بانتظار موافقة المطور", needsApproval: true }, { status: 403 });
+  }
+
+  // 🛡️ Rate limiting: max 5 عمليات تنفيذ في الدقيقة لكل مستخدم
+  const rl = checkRateLimit(`exec:${user.id}`, RATE_LIMITS.execute.max, RATE_LIMITS.execute.windowMs);
+  if (!rl.allowed) {
+    const retryAfter = Math.ceil((rl.resetAt - Date.now()) / 1000);
+    return NextResponse.json(
+      { ok: false, error: `تجاوزت الحد المسموح (${RATE_LIMITS.execute.max}/دقيقة). حاول بعد ${retryAfter} ثانية.` },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } }
+    );
   }
 
   try {

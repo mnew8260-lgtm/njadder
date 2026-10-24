@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema, hashPassword, createToken } from "@/lib/db";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  // 🛡️ Rate limit by IP (10 registrations/min)
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const rl = checkRateLimit(`register:${ip}`, RATE_LIMITS.auth.max, RATE_LIMITS.auth.windowMs);
+  if (!rl.allowed) {
+    const retryAfter = Math.ceil((rl.resetAt - Date.now()) / 1000);
+    return NextResponse.json(
+      { ok: false, error: `محاولات كثيرة. حاول بعد ${retryAfter} ثانية.` },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } }
+    );
+  }
+
   try {
     const { username, password } = await req.json();
     if (!username || !password) {
