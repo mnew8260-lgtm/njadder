@@ -272,40 +272,49 @@ export async function resolveChannelEntity(client: TelegramClient, input: string
 
 /**
  * إضافة عضو واحد لمجموعة (يقبل target كـ entity جاهز لتفادي getEntity المتكرر).
+ * يحاول 4 طرق للإضافة لزيادة نسبة النجاح.
  */
 export async function addSingleMember(
   client: TelegramClient,
-  targetGroup: any, //可以是 string أو entity جاهز
-  user: { id: string; access_hash?: string }
+  targetGroup: any,
+  user: { id: string; access_hash?: string; username?: string; first_name?: string }
 ) {
-  try {
-    // حلّ الـ target مرة واحدة (لو string) أو استخدم entity جاهز
-    let target: any = targetGroup;
-    if (typeof targetGroup === "string") {
+  let target: any = targetGroup;
+  // حلّ الـ target مرة واحدة (لو string)
+  if (typeof targetGroup === "string") {
+    try {
       target = await resolveChannelEntity(client, targetGroup);
+    } catch (e: any) {
+      return { ok: false, status: "error", reason: `تعذّر حلّ الهدف: ${e.message?.substring(0, 60)}` };
     }
+  }
 
-    let inputUser: any;
-
-    // Try access_hash first
-    if (user.access_hash && user.access_hash !== "0") {
-      inputUser = new Api.InputUser({
+  // ─── محاولة 1: InputUser مع access_hash ───
+  if (user.access_hash && user.access_hash !== "0") {
+    try {
+      const inputUser = new Api.InputUser({
         userId: BigInt(user.id) as any,
         accessHash: BigInt(user.access_hash) as any,
       });
-    } else {
-      // Resolve fresh via getEntity
-      try {
-        const entity = await client.getEntity(BigInt(user.id) as any);
-        inputUser = new Api.InputUser({
-          userId: BigInt(user.id) as any,
-          accessHash: (entity as any).accessHash || BigInt(0) as any,
-        });
-      } catch (e: any) {
-        return { ok: false, status: "skip", reason: "تعذّر حلّ المستخدم" };
-      }
+      await client.invoke(
+        new Api.channels.InviteToChannel({
+          channel: target,
+          users: [inputUser],
+        })
+      );
+      return { ok: true, status: "ok" };
+    } catch (e: any) {
+      // فشلت المحاولة الأولى، ننتقل للتالية
     }
+  }
 
+  // ─── محاولة 2: resolve من getEntity ثم InputUser ───
+  try {
+    const entity = await client.getEntity(BigInt(user.id) as any);
+    const inputUser = new Api.InputUser({
+      userId: BigInt(user.id) as any,
+      accessHash: (entity as any).accessHash || BigInt(0) as any,
+    });
     await client.invoke(
       new Api.channels.InviteToChannel({
         channel: target,
@@ -314,22 +323,68 @@ export async function addSingleMember(
     );
     return { ok: true, status: "ok" };
   } catch (e: any) {
-    const msg = e.message || "";
-    if (msg.includes("USER_ALREADY_PARTICIPANT")) return { ok: false, status: "already", reason: "موجود في القروب" };
-    if (msg.includes("USER_PRIVACY")) return { ok: false, status: "skip", reason: "خصوصية المستخدم" };
-    if (msg.includes("PEER_FLOOD") || msg.includes("FLOOD_WAIT")) {
-      const m = msg.match(/FLOOD_WAIT_(\d+)/);
-      return { ok: false, status: "flood", reason: m ? `انتظر ${m[1]}s` : "PeerFlood" };
-    }
-    if (msg.includes("CHAT_ADMIN_REQUIRED")) return { ok: false, status: "skip", reason: "تتطلب صلاحية أدمن" };
-    if (msg.includes("CHAT_WRITE_FORBIDDEN")) return { ok: false, status: "skip", reason: "لا صلاحية كتابة" };
-    if (msg.includes("USER_NOT_MUTUAL_CONTACT")) return { ok: false, status: "skip", reason: "ليس جهة اتصال متبادلة" };
-    if (msg.includes("USER_ID_INVALID")) return { ok: false, status: "skip", reason: "معرّف مستخدم غير صالح" };
-    if (msg.includes("BOT_METHOD_INVALID")) return { ok: false, status: "skip", reason: "لا يمكن إضافة بوت" };
-    if (msg.includes("INPUT_USER_DEACTIVATED")) return { ok: false, status: "skip", reason: "حساب محذوف" };
-    if (msg.includes("PEER_ID_INVALID")) return { ok: false, status: "skip", reason: "معرّف القروب غير صالح" };
-    return { ok: false, status: "error", reason: msg.substring(0, 80) };
+    // ننتقل للتالية
   }
+
+  // ─── محاولة 3: استخدام username (لو متوفر) ───
+  if (user.username && user.username.startsWith("@")) {
+    try {
+      const userEntity = await client.getEntity(user.username);
+      const inputUser = new Api.InputUser({
+        userId: BigInt((userEntity as any).id) as any,
+        accessHash: (userEntity as any).accessHash || BigInt(0) as any,
+      });
+      await client.invoke(
+        new Api.channels.InviteToChannel({
+          channel: target,
+          users: [inputUser],
+        })
+      );
+      return { ok: true, status: "ok" };
+    } catch (e: any) {
+      // ننتقل للتالية
+    }
+  }
+
+  // ─── محاولة 4: تمرير ID مباشرة كـ InputUser مع access_hash = 0 ───
+  try {
+    const inputUser = new Api.InputUser({
+      userId: BigInt(user.id) as any,
+      accessHash: BigInt(0) as any,
+    });
+    await client.invoke(
+      new Api.channels.InviteToChannel({
+        channel: target,
+        users: [inputUser],
+      })
+    );
+    return { ok: true, status: "ok" };
+  } catch (e: any) {
+    return parseAddError(e);
+  }
+}
+
+/**
+ * يحوّل خطأ تيليجرام لرسالة عربية مفهومة + status code.
+ */
+function parseAddError(e: any): { ok: false; status: string; reason: string } {
+  const msg = (e.message || "").toString();
+  if (msg.includes("USER_ALREADY_PARTICIPANT")) return { ok: false, status: "already", reason: "موجود في القروب" };
+  if (msg.includes("USER_PRIVACY") || msg.includes("PRIVACY")) return { ok: false, status: "skip", reason: "خصوصية المستخدم تمنع الإضافة" };
+  if (msg.includes("PEER_FLOOD") || msg.includes("FLOOD_WAIT")) {
+    const m = msg.match(/FLOOD_WAIT_(\d+)/);
+    return { ok: false, status: "flood", reason: m ? `انتظر ${m[1]}s` : "PeerFlood — راجع بعد ساعات" };
+  }
+  if (msg.includes("CHAT_ADMIN_REQUIRED")) return { ok: false, status: "skip", reason: "تتطلب صلاحية أدمن" };
+  if (msg.includes("CHAT_WRITE_FORBIDDEN")) return { ok: false, status: "skip", reason: "لا صلاحية كتابة" };
+  if (msg.includes("USER_NOT_MUTUAL_CONTACT")) return { ok: false, status: "skip", reason: "ليس جهة اتصال متبادلة" };
+  if (msg.includes("USER_ID_INVALID")) return { ok: false, status: "skip", reason: "معرّف مستخدم غير صالح" };
+  if (msg.includes("BOT_METHOD_INVALID")) return { ok: false, status: "skip", reason: "لا يمكن إضافة بوت" };
+  if (msg.includes("INPUT_USER_DEACTIVATED")) return { ok: false, status: "skip", reason: "حساب محذوف" };
+  if (msg.includes("PEER_ID_INVALID")) return { ok: false, status: "skip", reason: "معرّف القروب غير صالح" };
+  if (msg.includes("CHANNEL_PRIVATE") || msg.includes("CHAT_PRIVATE")) return { ok: false, status: "skip", reason: "القروب خاص" };
+  if (msg.includes("USER_BLOCKED")) return { ok: false, status: "skip", reason: "المستخدم محظور" };
+  return { ok: false, status: "skip", reason: msg.substring(0, 60) || "تعذّر الإضافة" };
 }
 
 export function smartDelay(base: number = 3): Promise<void> {

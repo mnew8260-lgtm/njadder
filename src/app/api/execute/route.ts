@@ -408,6 +408,7 @@ async function executeCommand(
 
       addLog(`➕ إضافة ${users.length} إلى المجموعة الهدف`);
       let added = 0, skipped = 0, already = 0, errors = 0;
+      const skipReasons: Record<string, number> = {};
       const errorDetails: string[] = [];
       for (const u of users) {
         const result = await addSingleMember(client, targetEntity, u);
@@ -415,12 +416,15 @@ async function executeCommand(
           added++;
           addLog(`✓ ${u.first_name || u.username || u.id}`);
         } else if (result.status === "flood") {
-          addLog(`⛔ Flood — توقف. انتظر ${result.reason}`);
+          addLog(`⛔ Flood — توقف. ${result.reason}`);
           break;
         } else if (result.status === "already") {
           already++;
         } else if (result.status === "skip") {
           skipped++;
+          // تتبّع أسباب التخطّي
+          const r = result.reason || "غير معروف";
+          skipReasons[r] = (skipReasons[r] || 0) + 1;
         } else {
           errors++;
           if (errorDetails.length < 5) errorDetails.push(`${u.id}: ${result.reason}`);
@@ -428,6 +432,15 @@ async function executeCommand(
         await smartDelay(delay);
       }
       addLog(`\n📊 ✓ ${added} أُضيف | ⊘ ${skipped} تخطّي | ⚠️ ${already} موجود | ❌ ${errors} خطأ${blacklistedSkipped ? ` | 🚫 ${blacklistedSkipped} محظور` : ""}`);
+
+      // عرض أسباب التخطّي (مهم جداً للتشخيص)
+      if (skipped > 0 && Object.keys(skipReasons).length > 0) {
+        addLog(`\n--- أسباب التخطّي ---`);
+        for (const [reason, count] of Object.entries(skipReasons).sort((a, b) => b[1] - a[1])) {
+          addLog(`  • ${reason}: ${count}`);
+        }
+      }
+
       if (errorDetails.length) {
         addLog(`\n--- أخطاء مفصّلة ---\n${errorDetails.join("\n")}`);
       }
