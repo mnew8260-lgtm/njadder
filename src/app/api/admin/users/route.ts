@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { SubscriptionService, PLAN_CONFIG, PlanType } from "@/lib/db";
+import { notifyUserApproved, notifyUserRejected } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -12,15 +13,19 @@ export async function GET() {
   if (!user) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
   if (user.role !== "admin") return NextResponse.json({ ok: false, error: "Admin required" }, { status: 403 });
 
-  const users = await SubscriptionService.getAllUsers();
-  // عدّ المستخدمين حسب الحالة لإحصائيات سريعة
-  const stats = {
-    total: users.length,
-    pending: users.filter((u: any) => u.status === "pending").length,
-    approved: users.filter((u: any) => u.status === "approved" || u.role === "admin").length,
-    rejected: users.filter((u: any) => u.status === "rejected").length,
-  };
-  return NextResponse.json({ ok: true, users, stats });
+  try {
+    const users = await SubscriptionService.getAllUsers();
+    const stats = {
+      total: users.length,
+      pending: users.filter((u: any) => u.status === "pending").length,
+      approved: users.filter((u: any) => u.status === "approved" || u.role === "admin").length,
+      rejected: users.filter((u: any) => u.status === "rejected").length,
+    };
+    return NextResponse.json({ ok: true, users, stats });
+  } catch (e: any) {
+    console.error("[admin/users] GET error:", e);
+    return NextResponse.json({ ok: false, error: "Failed to load users" }, { status: 500 });
+  }
 }
 
 // POST — admin actions: set_plan / approve / reject / delete
@@ -50,6 +55,12 @@ export async function POST(req: NextRequest) {
     if (action === "approve") {
       if (!userId) return NextResponse.json({ ok: false, error: "userId required" }, { status: 400 });
       await sql`UPDATE users SET status = 'approved' WHERE id = ${userId}`;
+      // Get username for notification
+      const rows = await sql`SELECT username FROM users WHERE id = ${userId}`;
+      const targetUser = (rows as any[])[0];
+      if (targetUser) {
+        notifyUserApproved(targetUser.username, user.username).catch(() => {});
+      }
       return NextResponse.json({ ok: true, message: "✅ تمت الموافقة على المستخدم" });
     }
 
@@ -57,6 +68,12 @@ export async function POST(req: NextRequest) {
     if (action === "reject") {
       if (!userId) return NextResponse.json({ ok: false, error: "userId required" }, { status: 400 });
       await sql`UPDATE users SET status = 'rejected' WHERE id = ${userId}`;
+      // Get username for notification
+      const rows = await sql`SELECT username FROM users WHERE id = ${userId}`;
+      const targetUser = (rows as any[])[0];
+      if (targetUser) {
+        notifyUserRejected(targetUser.username, user.username).catch(() => {});
+      }
       return NextResponse.json({ ok: true, message: "🚫 تم رفض المستخدم" });
     }
 
@@ -85,6 +102,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: false, error: "Unknown action" }, { status: 400 });
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+    console.error("[admin/users] POST error:", e);
+    return NextResponse.json({ ok: false, error: "حدث خطأ غير متوقع" }, { status: 500 });
   }
 }

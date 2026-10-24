@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ChannelsFooter } from "../components/ChannelsFooter";
 
 export default function RegisterPage() {
   const [username, setUsername] = useState("");
@@ -10,24 +11,34 @@ export default function RegisterPage() {
   const router = useRouter();
 
   async function register() {
-    if (!username || !password) return;
-    if (password.length < 6) { setError("كلمة المرور 6 أحرف على الأقل"); return; }
-    setLoading(true); setError("");
+    if (!username.trim()) {
+      setError("أدخل اسم المستخدم");
+      return;
+    }
+    if (password.length < 6) {
+      setError("كلمة المرور يجب أن تكون 6 أحرف على الأقل");
+      return;
+    }
+    setLoading(true);
+    setError("");
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: username.trim(), password }),
       });
       const data = await res.json();
       if (data.ok) {
-        // لو المستخدم بانتظار الموافقة → صفحة /pending
-        // لو أدمن (أول مستخدم) → الرئيسية مباشرة
+        // Pending → /pending page
+        // Admin (first user) → / directly
         if (data.needsApproval) router.push("/pending");
         else router.push("/");
+      } else {
+        setError(data.error || "فشل التسجيل");
       }
-      else setError(data.error || "فشل");
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) {
+      setError("خطأ في الاتصال: " + (e.message || "غير معروف"));
+    }
     setLoading(false);
   }
 
@@ -42,59 +53,51 @@ export default function RegisterPage() {
           <div>
             <label className="block text-sm text-neutral-400 mb-1">اسم المستخدم</label>
             <input
-              className="w-full bg-[#0a0a0a] text-white text-base rounded-lg px-3 py-3 border border-[#333] focus:border-amber-500/50 focus:outline-none"
+              className="w-full bg-[#0a0a0a] text-white text-base rounded-lg px-3 py-3 border border-[#333] focus:border-amber-500/50 focus:outline-none transition-colors"
               value={username}
-              onChange={e => setUsername(e.target.value)}
+              onChange={(e) => setUsername(e.target.value)}
               dir="ltr"
               autoFocus
+              disabled={loading}
+              autoComplete="username"
             />
           </div>
           <div>
             <label className="block text-sm text-neutral-400 mb-1">كلمة المرور (6+ أحرف)</label>
             <input
               type="password"
-              className="w-full bg-[#0a0a0a] text-white text-base rounded-lg px-3 py-3 border border-[#333] focus:border-amber-500/50 focus:outline-none"
+              className="w-full bg-[#0a0a0a] text-white text-base rounded-lg px-3 py-3 border border-[#333] focus:border-amber-500/50 focus:outline-none transition-colors"
               value={password}
-              onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && register()}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && register()}
               dir="ltr"
+              disabled={loading}
+              autoComplete="new-password"
             />
           </div>
-          {error && <p className="text-sm text-red-400 text-center">{error}</p>}
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg p-3 text-center">
+              {error}
+            </div>
+          )}
           <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-3 text-xs text-amber-300/80 leading-relaxed">
             ⚠️ ملاحظة: عند التسجيل، سيحتاج حسابك لموافقة المطور قبل أن تتمكن من استخدام الأداة.
           </div>
           <button
             onClick={register}
             disabled={loading}
-            className="w-full bg-amber-500 text-black font-bold rounded-lg py-3 text-base hover:bg-amber-400 transition-colors disabled:opacity-50 active:scale-95"
+            className="w-full bg-amber-500 text-black font-bold rounded-lg py-3 text-base hover:bg-amber-400 transition-colors disabled:opacity-50 active:scale-95 disabled:cursor-not-allowed"
           >
-            {loading ? "⏳" : "📝 تسجيل"}
+            {loading ? "⏳ جاري التسجيل..." : "📝 تسجيل"}
           </button>
           <p className="text-center text-sm text-neutral-500">
             لديك حساب؟{" "}
-            <a href="/login" className="text-amber-500 hover:underline">سجل دخول</a>
+            <a href="/login" className="text-amber-500 hover:underline">
+              سجل دخول
+            </a>
           </p>
         </div>
-
-        {/* ─── Official Channels Footer ─── */}
-        <div className="mt-6 bg-[#141414] border border-[#262626] rounded-2xl p-4 text-center">
-          <p className="text-xs text-neutral-500 mb-3">📡 القنوات الرسمية والدعم</p>
-          <div className="flex items-center justify-center gap-2 flex-wrap">
-            <a href="https://t.me/njadder_pro" target="_blank" rel="noopener noreferrer"
-               className="text-xs bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-bold transition-colors">
-              ⭐ @njadder_pro
-            </a>
-            <a href="https://t.me/NMDDER_ch" target="_blank" rel="noopener noreferrer"
-               className="text-xs bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-bold transition-colors">
-              📢 @NMDDER_ch
-            </a>
-            <a href="https://t.me/NMDDER_SUPPORT" target="_blank" rel="noopener noreferrer"
-               className="text-xs bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 px-3 py-1.5 rounded-lg font-bold transition-colors">
-              💬 @NMDDER_SUPPORT
-            </a>
-          </div>
-        </div>
+        <ChannelsFooter />
       </div>
     </div>
   );

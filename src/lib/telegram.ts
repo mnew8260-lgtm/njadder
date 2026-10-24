@@ -1,14 +1,12 @@
 import { TelegramClient, Api, sessions } from "telegram";
+import { SERVER_CONFIG } from "./config";
 
 // نستخرج StringSession من نفس الـ module instance لتجنب مشكلة instanceof
 // (مشكلة "Only StringSession and StoreSessions are supported currently :(")
-// السبب: عند استيراد StringSession من "telegram/sessions" كمسار فرعي،
-// يقوم Next.js بتحميل نسختين منفصلتين من GramJS بسبب serverExternalPackages،
-// فيفشل فحص instanceof StringSession داخل GramJS.
 const { StringSession } = sessions;
 
-const DEFAULT_API_ID = Number(process.env.TELEGRAM_API_ID || "35923747");
-const DEFAULT_API_HASH = process.env.TELEGRAM_API_HASH || "6de1cf34ed1e68d94615ba7b45391dde";
+const DEFAULT_API_ID = Number(SERVER_CONFIG.telegramApiId);
+const DEFAULT_API_HASH = SERVER_CONFIG.telegramApiHash;
 
 export function buildClient(sessionString: string, options?: {
   apiId?: number;

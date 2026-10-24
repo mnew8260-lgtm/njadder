@@ -1,14 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { ToastProvider } from "./components/Toast";
+import { APP } from "@/lib/config";
 
 export const metadata: Metadata = {
-  title: "NJADDER PRO — أداة تيليجرام الذهبية",
-  description: "118 أمر في 14 فئة — النسخة الاحترافية",
+  title: `${APP.name} — ${APP.tagline}`,
+  description: APP.description,
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "NJADDER",
+    title: APP.name,
   },
 };
 
@@ -24,7 +26,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ar" dir="rtl">
-      <body className="bg-[#0a0a0a] text-white antialiased">{children}</body>
+      <body className="bg-[#0a0a0a] text-white antialiased">
+        <ToastProvider>{children}</ToastProvider>
+      </body>
     </html>
   );
 }

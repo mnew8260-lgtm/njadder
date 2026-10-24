@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { ChannelsFooter } from "../components/ChannelsFooter";
 
 export default function PendingPage() {
   const [user, setUser] = useState<any>(null);
@@ -112,24 +113,7 @@ export default function PendingPage() {
           </p>
         </div>
 
-        {/* ─── Official Channels + Support ─── */}
-        <div className="mt-6 bg-[#141414] border border-[#262626] rounded-2xl p-4 text-center">
-          <p className="text-xs text-neutral-500 mb-3">📡 للدعم والمتابعة</p>
-          <div className="flex items-center justify-center gap-2 flex-wrap">
-            <a href="https://t.me/njadder_pro" target="_blank" rel="noopener noreferrer"
-               className="text-xs bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-bold transition-colors">
-              ⭐ @njadder_pro
-            </a>
-            <a href="https://t.me/NMDDER_ch" target="_blank" rel="noopener noreferrer"
-               className="text-xs bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-bold transition-colors">
-              📢 @NMDDER_ch
-            </a>
-            <a href="https://t.me/NMDDER_SUPPORT" target="_blank" rel="noopener noreferrer"
-               className="text-xs bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 px-3 py-1.5 rounded-lg font-bold transition-colors">
-              💬 @NMDDER_SUPPORT
-            </a>
-          </div>
-        </div>
+        <ChannelsFooter title="📡 للدعم والمتابعة" />
       </div>
     </div>
   );

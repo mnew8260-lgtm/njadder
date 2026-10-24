@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ChannelsFooter } from "../components/ChannelsFooter";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -10,8 +11,12 @@ export default function LoginPage() {
   const router = useRouter();
 
   async function login() {
-    if (!username || !password) return;
-    setLoading(true); setError("");
+    if (!username || !password) {
+      setError("أدخل اسم المستخدم وكلمة المرور");
+      return;
+    }
+    setLoading(true);
+    setError("");
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
@@ -22,12 +27,13 @@ export default function LoginPage() {
       if (data.ok) {
         router.push("/");
       } else if (data.needsApproval || data.rejected) {
-        // توجيه لصفحة /pending بدل عرض رسالة خطأ عادية
         router.push("/pending");
       } else {
-        setError(data.error || "فشل");
+        setError(data.error || "فشل تسجيل الدخول");
       }
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) {
+      setError("خطأ في الاتصال: " + (e.message || "غير معروف"));
+    }
     setLoading(false);
   }
 
@@ -42,59 +48,49 @@ export default function LoginPage() {
           <div>
             <label className="block text-sm text-neutral-400 mb-1">اسم المستخدم</label>
             <input
-              className="w-full bg-[#0a0a0a] text-white text-base rounded-lg px-3 py-3 border border-[#333] focus:border-amber-500/50 focus:outline-none"
+              className="w-full bg-[#0a0a0a] text-white text-base rounded-lg px-3 py-3 border border-[#333] focus:border-amber-500/50 focus:outline-none transition-colors"
               value={username}
-              onChange={e => setUsername(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && login()}
+              onChange={(e) => setUsername(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && login()}
               dir="ltr"
               autoComplete="username"
               autoFocus
+              disabled={loading}
             />
           </div>
           <div>
             <label className="block text-sm text-neutral-400 mb-1">كلمة المرور</label>
             <input
               type="password"
-              className="w-full bg-[#0a0a0a] text-white text-base rounded-lg px-3 py-3 border border-[#333] focus:border-amber-500/50 focus:outline-none"
+              className="w-full bg-[#0a0a0a] text-white text-base rounded-lg px-3 py-3 border border-[#333] focus:border-amber-500/50 focus:outline-none transition-colors"
               value={password}
-              onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && login()}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && login()}
               dir="ltr"
               autoComplete="current-password"
+              disabled={loading}
             />
           </div>
-          {error && <p className="text-sm text-red-400 text-center">{error}</p>}
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg p-3 text-center">
+              {error}
+            </div>
+          )}
           <button
             onClick={login}
             disabled={loading}
-            className="w-full bg-amber-500 text-black font-bold rounded-lg py-3 text-base hover:bg-amber-400 transition-colors disabled:opacity-50 active:scale-95"
+            className="w-full bg-amber-500 text-black font-bold rounded-lg py-3 text-base hover:bg-amber-400 transition-colors disabled:opacity-50 active:scale-95 disabled:cursor-not-allowed"
           >
-            {loading ? "⏳" : "🔐 دخول"}
+            {loading ? "⏳ جاري الدخول..." : "🔐 دخول"}
           </button>
           <p className="text-center text-sm text-neutral-500">
             ليس لديك حساب؟{" "}
-            <a href="/register" className="text-amber-500 hover:underline">سجل الآن</a>
+            <a href="/register" className="text-amber-500 hover:underline">
+              سجل الآن
+            </a>
           </p>
         </div>
-
-        {/* ─── Official Channels Footer ─── */}
-        <div className="mt-6 bg-[#141414] border border-[#262626] rounded-2xl p-4 text-center">
-          <p className="text-xs text-neutral-500 mb-3">📡 القنوات الرسمية والدعم</p>
-          <div className="flex items-center justify-center gap-2 flex-wrap">
-            <a href="https://t.me/njadder_pro" target="_blank" rel="noopener noreferrer"
-               className="text-xs bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-bold transition-colors">
-              ⭐ @njadder_pro
-            </a>
-            <a href="https://t.me/NMDDER_ch" target="_blank" rel="noopener noreferrer"
-               className="text-xs bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-bold transition-colors">
-              📢 @NMDDER_ch
-            </a>
-            <a href="https://t.me/NMDDER_SUPPORT" target="_blank" rel="noopener noreferrer"
-               className="text-xs bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 px-3 py-1.5 rounded-lg font-bold transition-colors">
-              💬 @NMDDER_SUPPORT
-            </a>
-          </div>
-        </div>
+        <ChannelsFooter />
       </div>
     </div>
   );

@@ -418,3 +418,116 @@ Stage Summary:
   3. bash deploy.sh
   4. bash setup-cron.sh
   5. (مرة واحدة) إعداد Nginx + certbot
+
+---
+Task ID: 9
+Agent: main (Z.ai)
+Task: مراجعة احترافية شاملة + إصلاحات + رفع مستوى الكود للاحترافية
+
+Work Log:
+- 🎯 مراجعة شاملة لكل الملفات (15+ ملف، ~3500 سطر)
+- 🆕 إنشاء src/lib/config.ts (ملف إعداد مركزي):
+  · CHANNELS: قائمة القنوات الثلاث (njadder_pro + NMDDER_ch + NMDDER_SUPPORT)
+  · APP: name/version/tagline/domain metadata
+  · LOGIN_CREATE_ONLY: ثابت لأوامر إنشاء الحساب
+  · isLoginCreateCommand(): helper function
+  · SERVER_CONFIG: getters آمنة لـ env vars
+- 🆕 إنشاء src/lib/notify.ts (إشعارات تيليجرام للأدمن):
+  · notifyAdmin(message): يرسل لـ @NMDDER_SUPPORT
+  · notifyNewUserPending(username, userId): تنبيه مستخدم جديد
+  · notifyUserApproved(username, admin): تنبيه موافقة
+  · notifyUserRejected(username, admin): تنبيه رفض
+  · silent fail (لا يكسر الـ flow الرئيسي)
+  · يستخدم NOTIFIER_SESSION من env (اختياري)
+- ✨ إعادة كتابة src/lib/auth.ts بـ TypeScript احترافي:
+  · Types: AuthUser, UserRole, UserStatus, AuthResult
+  · getCurrentUser(): يرجع AuthUser | null (بدل any)
+  · requireUser/requireAdmin/requireApproved: types صارمة
+  · checkAccess() جديد: يرجع { allowed, user, reason }
+  · console.error بدل silent throws
+- 🆕 إنشاء src/app/components/ChannelsFooter.tsx:
+  · مكون موحّد لعرض القنوات في الـ footer
+  · يأخذ title prop (افتراضي: "📡 القنوات الرسمية والدعم")
+  · يستخدم CHANNELS من config.ts (DRY)
+  · Color-coded: amber للمطورين، blue للدعم
+- 🆕 إنشاء src/app/components/Toast.tsx:
+  · ToastProvider + useToast hook
+  · 4 أنواع: success/error/info/warning
+  · auto-dismiss بعد 4 ثوان
+  · animate-in (opacity + translate)
+  · click to dismiss
+  · fallback للـ console لو بدون provider
+- 🆕 إنشاء src/app/components/LoadingSpinner.tsx:
+  · LoadingSpinner (3 أحجام: sm/md/lg)
+  · FullScreenLoader
+  · ButtonSpinner (inline)
+- ✨ تحديث src/app/layout.tsx:
+  · ToastProvider يلف كل التطبيق
+  · APP constants من config.ts
+- ✨ إعادة كتابة src/app/login/page.tsx:
+  · disabled inputs أثناء loading
+  · error box احترافي (bg-red بدل نص عادي)
+  · loading text: "⏳ جاري الدخول..."
+  · disabled:cursor-not-allowed
+  · استخدم ChannelsFooter مكون موحّد
+  · validation محسّن
+- ✨ إعادة كتابة src/app/register/page.tsx:
+  · نفس التحسينات (disabled, error box, loading text)
+  · trim() username قبل الإرسال
+  · autoComplete="new-password"
+- ✨ تحديث src/app/pending/page.tsx:
+  · استخدم ChannelsFooter بدل HTML مكرر
+- ✨ إعادة كتابة src/app/api/auth/login/route.ts:
+  · typeof validation لـ inputs
+  · نفس رسالة "بيانات غير صحيحة" لكلا الحالتين (ضد user enumeration)
+  · trim() username
+  · console.error بدل throw
+  · رسائل خطأ احترافية
+- ✨ إعادة كتابة src/app/api/auth/register/route.ts:
+  · validation شامل: length, regex (a-zA-Z0-9_-), trim
+  · notifyNewUserPending() عند مستخدم جديد (best-effort)
+  · نفس التحسينات الأمنية
+- ✨ تحديث src/app/api/admin/users/route.ts:
+  · notifyUserApproved/notifyUserRejected عند الموافقة/الرفض
+  · try/catch في GET أيضاً
+  · console.error للأخطاء
+- ✨ تحديث src/lib/telegram.ts:
+  · استخدم SERVER_CONFIG بدل process.env مباشرة
+- ✨ تحديث .env.example:
+  · أضيف NOTIFIER_SESSION (اختياري)
+  · شرح واضح لكل متغير
+- ✅ إصلاح bug: مسار استيراد خاطئ (./components/ → ../components/)
+- ✅ البناء نجح بالكامل
+- ✅ كل الصفحات (/login, /register, /pending) → HTTP 200
+- ✅ Channel footer يحتوي القنوات الثلاث (njadder_pro + NMDDER_ch + NMDDER_SUPPORT)
+
+Stage Summary:
+- ✅ رفع مستوى الكود للاحترافية:
+  · TypeScript types صارمة (AuthUser, UserRole, UserStatus)
+  · مكونات reusable (ChannelsFooter, Toast, LoadingSpinner)
+  · config مركزي (DRY principle)
+  · validation شامل في كل APIs
+  · error handling موحّد (try/catch + console.error)
+  · user enumeration prevention
+  · accessibility (role="alert", aria-label)
+- ✅ ميزات جديدة:
+  · إشعارات تيليجرام تلقائية للأدمن (3 أنواع)
+  · Toast notifications في الواجهة
+  · Loading states احترافية
+  · disabled inputs أثناء العمليات
+- الملفات الجديدة (5):
+  · src/lib/config.ts
+  · src/lib/notify.ts
+  · src/app/components/ChannelsFooter.tsx
+  · src/app/components/Toast.tsx
+  · src/app/components/LoadingSpinner.tsx
+- الملفات المُعادة كتابتها/المُحسّنة (8):
+  · src/lib/auth.ts (TypeScript types)
+  · src/lib/telegram.ts (config)
+  · src/app/layout.tsx (ToastProvider)
+  · src/app/login/page.tsx (UX + components)
+  · src/app/register/page.tsx (UX + validation)
+  · src/app/pending/page.tsx (ChannelsFooter)
+  · src/app/api/auth/login/route.ts (security + UX)
+  · src/app/api/auth/register/route.ts (validation + notify)
+  · src/app/api/admin/users/route.ts (notify + try/catch)

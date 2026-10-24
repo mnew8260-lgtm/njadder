@@ -19,24 +19,36 @@ export async function POST(req: NextRequest) {
 
   try {
     const { username, password } = await req.json();
+
+    // ─── Validation ───
     if (!username || !password) {
-      return NextResponse.json({ ok: false, error: "اسم المستخدم وكلمة المرور مطلوبان" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "اسم المستخدم وكلمة المرور مطلوبان" },
+        { status: 400 }
+      );
+    }
+    if (typeof username !== "string" || typeof password !== "string") {
+      return NextResponse.json(
+        { ok: false, error: "بيانات غير صالحة" },
+        { status: 400 }
+      );
     }
 
     await ensureSchema();
 
-    const rows = await sql`SELECT * FROM users WHERE username = ${username}`;
+    // ─── Lookup user ───
+    const rows = await sql`SELECT * FROM users WHERE username = ${username.trim()}`;
     const user = (rows as any[])[0];
 
-    if (!user) {
-      return NextResponse.json({ ok: false, error: "بيانات الدخول غير صحيحة" }, { status: 401 });
+    if (!user || !verifyPassword(password, user.password_hash)) {
+      // Same error message for both cases to prevent user enumeration
+      return NextResponse.json(
+        { ok: false, error: "بيانات الدخول غير صحيحة" },
+        { status: 401 }
+      );
     }
 
-    if (!verifyPassword(password, user.password_hash)) {
-      return NextResponse.json({ ok: false, error: "بيانات الدخول غير صحيحة" }, { status: 401 });
-    }
-
-    // التحقق من حالة الموافقة (الأدمن يتخطّى هذا الفحص)
+    // ─── Check approval status (admins skip) ───
     if (user.role !== "admin") {
       if (user.status === "pending") {
         return NextResponse.json({
@@ -54,10 +66,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ─── Issue session token ───
     const token = await createToken(user.id);
     const res = NextResponse.json({
       ok: true,
-      user: { id: user.id, username: user.username, role: user.role, status: user.status || "approved" },
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        status: user.status || "approved",
+      },
     });
     res.cookies.set("njadder_session", token, {
       httpOnly: true,
@@ -68,7 +86,11 @@ export async function POST(req: NextRequest) {
     });
     return res;
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+    console.error("[login] Error:", e);
+    return NextResponse.json(
+      { ok: false, error: "حدث خطأ غير متوقع. حاول مرة أخرى." },
+      { status: 500 }
+    );
   }
 }
 
