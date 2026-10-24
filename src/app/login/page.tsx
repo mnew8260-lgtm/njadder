@@ -19,8 +19,14 @@ export default function LoginPage() {
         body: JSON.stringify({ username, password }),
       });
       const data = await res.json();
-      if (data.ok) router.push("/");
-      else setError(data.error || "فشل");
+      if (data.ok) {
+        router.push("/");
+      } else if (data.needsApproval || data.rejected) {
+        // توجيه لصفحة /pending بدل عرض رسالة خطأ عادية
+        router.push("/pending");
+      } else {
+        setError(data.error || "فشل");
+      }
     } catch (e: any) { setError(e.message); }
     setLoading(false);
   }

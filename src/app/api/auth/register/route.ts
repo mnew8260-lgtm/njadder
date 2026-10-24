@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
     res.cookies.set("njadder_session", token, {
       httpOnly: true,
       sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
       maxAge: 7 * 24 * 60 * 60,
       path: "/",
     });

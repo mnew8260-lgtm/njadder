@@ -277,3 +277,60 @@ Stage Summary:
 - التحذير "Package telegram can't be external" اختفى من البناء
 - الملف المعدّل: next.config.mjs فقط (سطر واحد + تعليق)
 - النشر على VPS: git pull && pm2 restart njadder
+
+---
+Task ID: 7
+Agent: main (Z.ai)
+Task: مراجعة شاملة للمشروع + إصلاحات أمنية ومنطقية
+
+Work Log:
+- مراجعة شاملة لكل الملفات (15 ملف، ~3000 سطر)
+- 🐛 BUG حرج مكتشف: في الإصلاح السابق، client=null لكل أوامر category=login
+  لكن أوامر مثل accountinfogetter, changeraccount, banfilter, permanentlimitremover,
+  otpviewer, autoidcloner, setprofilepic, removeprofilepic تستخدم client.getMe(),
+  client.invoke(), client.sendMessage() — كانت ستفشل بـ "Cannot read properties of null"
+- ✅ إصلاح: تضييق نطاق "بدون حساب" لأربعة أوامر فقط:
+  LOGIN_CREATE_ONLY = ["login", "loginbycsv", "logintypeone", "logintypetwo"]
+  باقي أوامر login تتطلب حساباً موجوداً كما هو متوقع
+- نفس الإصلاح طُبّق في src/app/page.tsx:
+  · executeCommand() يستخدم LOGIN_CREATE_ONLY
+  · بطاقة "📱 الحساب" تُخفى فقط لأوامر إنشاء الحساب
+  · زر "تنفيذ الأمر" مُفعّل فقط لأوامر إنشاء الحساب بدون حساب
+- 🔐 تحسينات أمنية:
+  · cookies secure: process.env.NODE_ENV === "production" (login + register)
+  · إضافة try/catch لـ /api/auth/me و /api/subscription/plans (كانت بدونه)
+  · تحديث .env.example بـ JWT_SECRET و TELEGRAM_API_ID/HASH وتنبيهات أمنية
+- 🐛 إصلاح صفحة /login:
+  · لو API رجع needsApproval:true أو rejected:true → redirect لـ /pending
+  · بدلاً من عرض رسالة خطأ عادية والبقاء في صفحة login
+- مراجعة DB schema: 6 جداول + 2 services (SubscriptionService + BlacklistService)
+  · users, telegram_accounts, proxies, api_pool, activity_log, usage_log, blacklist
+  · كلها مع indexes و UNIQUE constraints و ON CONFLICT handlers
+- مراجعة الأمان:
+  · ✅ لا SQL injection (postgres.js tagged templates)
+  · ✅ لا XSS (لا dangerouslySetInnerHTML)
+  · ✅ Cookies httpOnly + sameSite:lax + secure في production
+  · ⚠️ JWT_SECRET له fallback ثابت في الكود — يجب تعيينه في .env على VPS
+  · ⚠️ TELEGRAM_API_ID/HASH fallback عام — يمكن أن يحظر من تيليجرام
+- مراجعة الأوامر (118 أمر):
+  · ~70% لها منطق مخصص فعلي في executeCommand
+  · ~30% لها default fallback ("تم تنفيذ: ... — جاهز")
+  · فئة wrappers (6 أوامر) كلها default fallback — تحتاج تطبيق لاحقاً
+- مراجعة TypeScript: 56 استخدام لـ :any — مقبول للتعامل مع GramJS (types ناقصة)
+- مراجعة structure: 8 صفحات + 7 APIs + 3 lib files + 1 manifest + 1 .env.example
+
+Stage Summary:
+- ✅ تم اكتشاف وإصلاح bug حرج في تنفيذ أوامر category=login
+- ✅ تحسينات أمنية: cookies secure flag + try/catch شامل
+- ✅ إصلاح flow صفحة /login للمستخدمين المعلّقين/المرفوضين
+- ✅ .env.example محدّث بكل المتغيرات المطلوبة + تنبيهات
+- ✅ البناء نجح بدون أخطاء + كل الصفحات (8) → HTTP 200
+- الملفات المعدّلة:
+  · src/app/api/execute/route.ts (تضييق LOGIN_CREATE_ONLY)
+  · src/app/page.tsx (نفس التضييق + زر التنفيذ)
+  · src/app/api/auth/login/route.ts (cookies secure flag)
+  · src/app/api/auth/register/route.ts (cookies secure flag)
+  · src/app/api/auth/me/route.ts (try/catch)
+  · src/app/api/subscription/plans/route.ts (try/catch)
+  · src/app/login/page.tsx (redirect لـ /pending عند needsApproval)
+  · .env.example (تحديث شامل)

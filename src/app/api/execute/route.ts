@@ -27,10 +27,12 @@ export async function POST(req: NextRequest) {
     const cmd = getCommandByKey(commandKey);
     if (!cmd) return NextResponse.json({ ok: false, error: "Command not found" }, { status: 404 });
 
-    // ─── أوامر تسجيل الدخول (1-22) لا تحتاج حساب موجود ───
-    // لأنها تُنشئ حساباً جديداً (send_code / loginbycsv / etc.)
-    if (cmd.category === "login") {
-      // نمرر null للعميل لأن executeCommand سيُنشئ عملاء جدد لكل عملية login
+    // ─── أوامر تسجيل الدخول التي تُنشئ حساباً جديداً ───
+    // هذه فقط لا تحتاج حساب موجود لأنها تُنشئ session جديدة
+    const LOGIN_CREATE_ONLY = ["login", "loginbycsv", "logintypeone", "logintypetwo"];
+    const isLoginCreateCmd = cmd.category === "login" && LOGIN_CREATE_ONLY.includes(cmd.key);
+
+    if (isLoginCreateCmd) {
       try {
         const result = await executeCommand(null, cmd, params || {}, user.id, "", "");
         return NextResponse.json(result);
@@ -39,7 +41,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ─── باقي الأوامر تتطلب حساباً موجوداً ───
+    // ─── باقي الأوامر (بما فيها أوامر login غير الـ create) تتطلب حساباً موجوداً ───
     if (!accountId) {
       return NextResponse.json({ ok: false, error: "accountId required for this command" }, { status: 400 });
     }
