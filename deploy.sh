@@ -1,9 +1,11 @@
 #!/bin/bash
 # ════════════════════════════════════════════════════════════
-# NJADDER PRO v7.0 — Production Deploy Script
+# NJADDER PRO v7.0 — Production Deploy Script (Smart)
 # ════════════════════════════════════════════════════════════
-# Safe zero-downtime deploy with rollback on failure.
-# Usage: bash deploy.sh
+# Smart zero-downtime deploy with automatic rebuild detection.
+# Usage:
+#   bash deploy.sh          — smart (rebuild only if needed)
+#   bash deploy.sh --force  — always rebuild
 # ════════════════════════════════════════════════════════════
 
 set -euo pipefail
@@ -11,6 +13,7 @@ set -euo pipefail
 INSTALL_DIR="${HOME}/njadder"
 LOG_FILE="/tmp/njadder-build-$(date +%Y%m%d-%H%M%S).log"
 BACKUP_DIR="${HOME}/njadder-backups"
+FORCE_REBUILD="${1:-}"
 
 cd "$INSTALL_DIR" || { echo "❌ Run install.sh first"; exit 1; }
 
@@ -20,7 +23,7 @@ echo "  $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
 echo "═══════════════════════════════════════════════════"
 echo ""
 
-# ─── Step 1: Save current state for rollback ──────────────
+# ─── Step 1: Save current state ───────────────────────────
 PREV_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "none")
 echo "📋 Current commit: ${PREV_COMMIT:0:8}"
 
@@ -36,25 +39,77 @@ echo "📦 Pulling latest from GitHub..."
 git fetch origin main
 LOCAL=$(git rev-parse HEAD)
 REMOTE=$(git rev-parse origin/main)
-if [ "$LOCAL" = "$REMOTE" ] && [ "${1:-}" != "--force" ]; then
+
+if [ "$LOCAL" = "$REMOTE" ]; then
   echo "✓ Already up-to-date (commit ${LOCAL:0:8})"
-  echo "💡 Use 'bash deploy.sh --force' to rebuild anyway"
+else
+  git pull origin main
+  NEW_COMMIT=$(git rev-parse HEAD)
+  echo "✓ Updated: ${PREV_COMMIT:0:8} → ${NEW_COMMIT:0:8}"
+fi
+
+# ─── Step 3: Smart rebuild detection ──────────────────────
+echo ""
+echo "🔍 Checking if rebuild is needed..."
+
+NEED_REBUILD=false
+REASON=""
+
+# Check 1: --force flag
+if [ "$FORCE_REBUILD" = "--force" ]; then
+  NEED_REBUILD=true
+  REASON="forced (--force)"
+fi
+
+# Check 2: .next directory missing
+if [ "$NEED_REBUILD" = "false" ] && [ ! -d ".next" ]; then
+  NEED_REBUILD=true
+  REASON=".next missing"
+fi
+
+# Check 3: .next/BUILD_ID missing
+if [ "$NEED_REBUILD" = "false" ] && [ ! -f ".next/BUILD_ID" ]; then
+  NEED_REBUILD=true
+  REASON=".next/BUILD_ID missing"
+fi
+
+# Check 4: Any source file newer than BUILD_ID
+if [ "$NEED_REBUILD" = "false" ]; then
+  NEWEST_SRC=$(find src/ -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.css" -o -name "*.json" \) -newer .next/BUILD_ID 2>/dev/null | head -1)
+  if [ -n "$NEWEST_SRC" ]; then
+    NEED_REBUILD=true
+    REASON="source files newer than build ($NEWEST_SRC)"
+  fi
+fi
+
+# Check 5: next.config.mjs or package.json changed
+if [ "$NEED_REBUILD" = "false" ]; then
+  if [ -f "next.config.mjs" ] && [ "next.config.mjs" -nt ".next/BUILD_ID" ]; then
+    NEED_REBUILD=true
+    REASON="next.config.mjs changed"
+  fi
+fi
+
+if [ "$NEED_REBUILD" = "false" ]; then
+  echo "✓ Build is up-to-date — no rebuild needed"
+  echo "💡 Use 'bash deploy.sh --force' to force rebuild"
+  echo ""
+  echo "═══════════════════════════════════════════════════"
+  echo "  ✅ ALREADY DEPLOYED (no changes needed)"
+  echo "═══════════════════════════════════════════════════"
   exit 0
 fi
-git pull origin main
-NEW_COMMIT=$(git rev-parse HEAD)
-echo "✓ Updated: ${PREV_COMMIT:0:8} → ${NEW_COMMIT:0:8}"
 
-# ─── Step 3: Install dependencies (only if package.json changed) ───
-if git diff --name-only "$PREV_COMMIT" "$NEW_COMMIT" 2>/dev/null | grep -q "package.json\|package-lock.json"; then
+echo "⚠️  Rebuild needed: $REASON"
+
+# ─── Step 4: Install dependencies (if package.json changed) ───
+if git diff --name-only "$PREV_COMMIT" HEAD 2>/dev/null | grep -q "package.json\|package-lock.json"; then
   echo ""
   echo "📦 Installing dependencies..."
   npm install --legacy-peer-deps 2>&1 | tail -3
-else
-  echo "✓ package.json unchanged — skipping npm install"
 fi
 
-# ─── Step 4: Backup current build (for rollback) ─────────
+# ─── Step 5: Backup current build (for rollback) ─────────
 if [ -d ".next" ]; then
   mkdir -p "$BACKUP_DIR"
   tar -czf "$BACKUP_DIR/.next-$(date +%Y%m%d-%H%M%S).tar.gz" .next 2>/dev/null || true
@@ -63,12 +118,12 @@ if [ -d ".next" ]; then
   echo "✓ Previous build backed up"
 fi
 
-# ─── Step 5: Clean and build ──────────────────────────────
+# ─── Step 6: Clean and build ──────────────────────────────
 echo ""
 echo "🔨 Building (logs → $LOG_FILE)..."
 
-# Remove lock + cache
-rm -rf .next/lock node_modules/.cache 2>/dev/null || true
+# FULL CLEAN — remove .next entirely for fresh build
+rm -rf .next .next/lock node_modules/.cache 2>/dev/null || true
 
 # Build with memory limit
 if ! NODE_OPTIONS="--max-old-space-size=2048" npx next build > "$LOG_FILE" 2>&1; then
@@ -89,33 +144,36 @@ if [ ! -d ".next" ] || [ ! -f ".next/BUILD_ID" ]; then
 fi
 
 echo "✓ Build successful"
-grep -E "Compiled|Generating|Route" "$LOG_FILE" | head -10
+echo "  Build ID: $(cat .next/BUILD_ID)"
 
-# ─── Step 6: Restart PM2 ──────────────────────────────────
+# ─── Step 7: Restart PM2 (kill all old processes first) ───
 echo ""
 echo "🔄 Restarting PM2..."
+
+# Kill ALL next-server processes to avoid port conflicts
+pkill -9 -f "next-server" 2>/dev/null || true
+sleep 2
+
 if command -v pm2 >/dev/null 2>&1; then
   pm2 restart njadder --update-env 2>&1 | tail -5
   pm2 save 2>/dev/null || true
   echo "✓ PM2 restarted"
 else
   # Fallback: nohup
-  pkill -9 -f "next start" 2>/dev/null || true
-  sleep 2
   setsid nohup npx next start > /tmp/next.log 2>&1 < /dev/null &
   disown
   sleep 3
   echo "✓ Started with nohup (PM2 not installed)"
 fi
 
-# ─── Step 7: Health check ─────────────────────────────────
+# ─── Step 8: Health check ─────────────────────────────────
 echo ""
 echo "🏥 Health check..."
-sleep 3
+sleep 5
 
 HEALTH_OK=true
-for endpoint in "/" "/login" "/api/auth/me"; do
-  CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://localhost:3000$endpoint" 2>/dev/null || echo "000")
+for endpoint in "/" "/login" "/api/auth/me" "/api/health"; do
+  CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 8 "http://localhost:3000$endpoint" 2>/dev/null || echo "000")
   if [ "$CODE" = "200" ] || [ "$CODE" = "401" ]; then
     echo "  ✓ $endpoint → $CODE"
   else
@@ -130,7 +188,7 @@ if [ "$HEALTH_OK" = "false" ]; then
   exit 1
 fi
 
-# ─── Step 8: Approve all existing users (idempotent) ──────
+# ─── Step 9: Approve all existing users (idempotent) ──────
 echo ""
 echo "👥 Ensuring existing users are approved..."
 node -e "
@@ -147,12 +205,16 @@ const sql = postgres(process.env.DATABASE_URL, { ssl: 'prefer', prepare: false, 
 " 2>/dev/null || echo "  ⚠ Skipped (DB may be initializing)"
 
 # ─── Done ─────────────────────────────────────────────────
+FINAL_COMMIT=$(git rev-parse HEAD)
 echo ""
 echo "═══════════════════════════════════════════════════"
 echo "  ✅ DEPLOY SUCCESSFUL"
 echo "═══════════════════════════════════════════════════"
-echo "  Commit:  ${NEW_COMMIT:0:8}"
-echo "  Build:   .next/BUILD_ID = $(cat .next/BUILD_ID 2>/dev/null || echo '?')"
-echo "  Logs:    $LOG_FILE"
-echo "  App:     https://njadder-app.tech"
+echo "  Commit:    ${FINAL_COMMIT:0:8}"
+echo "  Build ID:  $(cat .next/BUILD_ID 2>/dev/null || echo '?')"
+echo "  Reason:    $REASON"
+echo "  Logs:      $LOG_FILE"
+echo "  App:       https://njadder-app.tech"
 echo "═══════════════════════════════════════════════════"
+echo ""
+echo "💡 If browser still shows old UI, hard-refresh with Ctrl+Shift+R"
