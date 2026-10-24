@@ -22,8 +22,6 @@ export default function Home() {
   const [loginPassword, setLoginPassword] = useState("");
   const [loginSession, setLoginSession] = useState("");
   const [loginHash, setLoginHash] = useState("");
-  const [loginApiId, setLoginApiId] = useState("");
-  const [loginApiHash, setLoginApiHash] = useState("");
   const router = useRouter();
 
   useEffect(() => {
@@ -100,7 +98,7 @@ export default function Home() {
     try {
       const res = await fetch("/api/accounts", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "send_code", phone: loginPhone, apiId: loginApiId || undefined, apiHash: loginApiHash || undefined }),
+        body: JSON.stringify({ action: "send_code", phone: loginPhone }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -119,7 +117,7 @@ export default function Home() {
     try {
       const res = await fetch("/api/accounts", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "verify_code", phone: loginPhone, code: loginCode, sessionString: loginSession, phoneCodeHash: loginHash, apiId: loginApiId || undefined, apiHash: loginApiHash || undefined }),
+        body: JSON.stringify({ action: "verify_code", phone: loginPhone, code: loginCode, sessionString: loginSession, phoneCodeHash: loginHash }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -140,7 +138,7 @@ export default function Home() {
     try {
       const res = await fetch("/api/accounts", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "verify_2fa", phone: loginPhone, password: loginPassword, sessionString: loginSession, apiId: loginApiId || undefined, apiHash: loginApiHash || undefined }),
+        body: JSON.stringify({ action: "verify_2fa", phone: loginPhone, password: loginPassword, sessionString: loginSession }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -265,18 +263,6 @@ export default function Home() {
                       <label className="block text-sm text-neutral-300 mb-1">📱 رقم الهاتف *</label>
                       <input type="tel" className="w-full bg-[#0a0a0a] text-white text-base rounded-lg px-3 py-3 border border-[#222] focus:border-amber-500/30 focus:outline-none"
                         placeholder="+9665XXXXXXXX" value={loginPhone} onChange={e => setLoginPhone(e.target.value)} dir="ltr" autoFocus />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-sm text-neutral-300 mb-1">API ID (اختياري)</label>
-                        <input type="text" className="w-full bg-[#0a0a0a] text-white text-sm rounded-lg px-3 py-2 border border-[#222] focus:border-amber-500/30 focus:outline-none"
-                          placeholder="افتراضي" value={loginApiId} onChange={e => setLoginApiId(e.target.value)} dir="ltr" />
-                      </div>
-                      <div>
-                        <label className="block text-sm text-neutral-300 mb-1">API Hash (اختياري)</label>
-                        <input type="text" className="w-full bg-[#0a0a0a] text-white text-sm rounded-lg px-3 py-2 border border-[#222] focus:border-amber-500/30 focus:outline-none"
-                          placeholder="افتراضي" value={loginApiHash} onChange={e => setLoginApiHash(e.target.value)} dir="ltr" />
-                      </div>
                     </div>
                     <button onClick={doLoginSendCode} disabled={executing || !loginPhone}
                       className="w-full bg-amber-500 text-black font-bold rounded-xl py-3 hover:bg-amber-400 transition-colors disabled:opacity-50 active:scale-[0.98]">

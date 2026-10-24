@@ -12,8 +12,6 @@ export default function AccountsPage() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [phone, setPhone] = useState("");
-  const [apiId, setApiId] = useState("");
-  const [apiHash, setApiHash] = useState("");
   const [step, setStep] = useState<"phone" | "code" | "2fa">("phone");
   const [code, setCode] = useState("");
   const [password2fa, setPassword2fa] = useState("");
@@ -53,7 +51,7 @@ export default function AccountsPage() {
     try {
       const res = await fetch("/api/accounts", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "send_code", phone, apiId: apiId || undefined, apiHash: apiHash || undefined }),
+        body: JSON.stringify({ action: "send_code", phone }),
       });
       const data = await res.json();
       if (data.ok) { setSessionString(data.sessionString); setPhoneCodeHash(data.phoneCodeHash); setStep("code"); setInfo("✅ تم إرسال الكود إلى تيليجرام"); }
@@ -68,7 +66,7 @@ export default function AccountsPage() {
     try {
       const res = await fetch("/api/accounts", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "verify_code", phone, code, sessionString, phoneCodeHash, apiId: apiId || undefined, apiHash: apiHash || undefined }),
+        body: JSON.stringify({ action: "verify_code", phone, code, sessionString, phoneCodeHash }),
       });
       const data = await res.json();
       if (data.ok) { setInfo("✅ تم تسجيل الدخول!"); setPhone(""); setCode(""); setStep("phone"); loadAccounts(); }
@@ -84,7 +82,7 @@ export default function AccountsPage() {
     try {
       const res = await fetch("/api/accounts", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "verify_2fa", phone, password: password2fa, sessionString, apiId: apiId || undefined, apiHash: apiHash || undefined }),
+        body: JSON.stringify({ action: "verify_2fa", phone, password: password2fa, sessionString }),
       });
       const data = await res.json();
       if (data.ok) { setInfo("✅ تم تسجيل الدخول!"); setPhone(""); setPassword2fa(""); setStep("phone"); loadAccounts(); }
@@ -101,8 +99,6 @@ export default function AccountsPage() {
       const text = await file.text();
       let parsedSession = "";
       let parsedPhone = "";
-      let parsedApiId = "";
-      let parsedApiHash = "";
 
       const ext = file.name.toLowerCase().split(".").pop();
 
@@ -112,8 +108,6 @@ export default function AccountsPage() {
           const obj = JSON.parse(text);
           parsedSession = obj.session || obj.session_string || obj.sessionString || obj.string_session || "";
           parsedPhone = obj.phone || obj.phone_number || obj.phoneNumber || "";
-          parsedApiId = String(obj.api_id || obj.apiId || "");
-          parsedApiHash = obj.api_hash || obj.apiHash || "";
         } catch {
           parsedSession = text.trim();
         }
@@ -125,8 +119,6 @@ export default function AccountsPage() {
             const obj = JSON.parse(trimmed);
             parsedSession = obj.session || obj.session_string || obj.sessionString || "";
             parsedPhone = obj.phone || "";
-            parsedApiId = String(obj.api_id || "");
-            parsedApiHash = obj.api_hash || "";
           } catch { parsedSession = trimmed; }
         } else if (trimmed.includes("=")) {
           // شكل key=value كل سطر
@@ -138,8 +130,6 @@ export default function AccountsPage() {
             const v = m[2].trim().replace(/^["']|["']$/g, "");
             if (k === "session" || k === "session_string" || k === "string_session") parsedSession = v;
             else if (k === "phone" || k === "phone_number") parsedPhone = v;
-            else if (k === "api_id" || k === "apiid") parsedApiId = v;
-            else if (k === "api_hash" || k === "apihash") parsedApiHash = v;
           }
         } else {
           // نص خام = session
@@ -168,8 +158,6 @@ export default function AccountsPage() {
 
       setFileInput(parsedSession);
       if (parsedPhone) setPhone(parsedPhone);
-      if (parsedApiId) setApiId(parsedApiId);
-      if (parsedApiHash) setApiHash(parsedApiHash);
       setInfo(`✅ تم تحميل الملف (${file.name}) — طول الجلسة: ${parsedSession.length} حرف. اضغط "استيراد الجلسة" للمتابعة.`);
     } catch (e: any) {
       setInfo("");
@@ -198,8 +186,6 @@ export default function AccountsPage() {
           action: "import_session",
           session: fileInput.trim(),
           phone: phone || undefined,
-          apiId: apiId || undefined,
-          apiHash: apiHash || undefined,
         }),
       });
       const data = await res.json();
@@ -289,10 +275,6 @@ export default function AccountsPage() {
               <label className="block text-sm text-neutral-400 mb-1">📱 رقم الهاتف *</label>
               <input type="tel" className="w-full bg-[#0a0a0a] text-white text-base rounded-lg px-3 py-3 border border-[#333] focus:border-amber-500/50 focus:outline-none" placeholder="+9665XXXXXXXX" value={phone} onChange={e => setPhone(e.target.value)} dir="ltr" autoFocus />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div><label className="block text-sm text-neutral-400 mb-1">API ID (اختياري)</label><input type="text" className="w-full bg-[#0a0a0a] text-white text-base rounded-lg px-3 py-3 border border-[#333] focus:border-amber-500/50 focus:outline-none" placeholder="افتراضي" value={apiId} onChange={e => setApiId(e.target.value)} dir="ltr" /></div>
-              <div><label className="block text-sm text-neutral-400 mb-1">API Hash (اختياري)</label><input type="text" className="w-full bg-[#0a0a0a] text-white text-base rounded-lg px-3 py-3 border border-[#333] focus:border-amber-500/50 focus:outline-none" placeholder="افتراضي" value={apiHash} onChange={e => setApiHash(e.target.value)} dir="ltr" /></div>
-            </div>
             <button onClick={sendCode} disabled={busy || !phone} className="w-full bg-amber-500 text-black font-bold rounded-lg py-3 text-base hover:bg-amber-400 transition-colors disabled:opacity-50 active:scale-95">{busy ? "⏳ جاري الإرسال..." : "📨 إرسال الكود"}</button>
           </div>
         )}
@@ -321,7 +303,7 @@ export default function AccountsPage() {
             <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-3 text-xs text-amber-300/80 leading-relaxed">
               💡 يدعم الاستيراد من:
               <ul className="list-disc list-inside mt-1 space-y-0.5 text-neutral-400">
-                <li>ملف <span dir="ltr" className="text-amber-400">.json</span> يحتوي على <code className="text-amber-400">{`{session, phone, api_id, api_hash}`}</code></li>
+                <li>ملف <span dir="ltr" className="text-amber-400">.json</span> يحتوي على <code className="text-amber-400">{`{session, phone}`}</code></li>
                 <li>ملف <span dir="ltr" className="text-amber-400">.txt</span> يحتوي على session string خام أو أسطر key=value</li>
                 <li>ملف <span dir="ltr" className="text-amber-400">.session</span> بصيغة GramJS StringSession (نص)</li>
                 <li>أو الصق الجلسة يدوياً في الحقل أسفل</li>
@@ -365,19 +347,9 @@ export default function AccountsPage() {
             </div>
 
             {/* بيانات إضافية اختيارية */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-sm text-neutral-400 mb-1">📱 الرقم (اختياري)</label>
-                <input type="tel" className="w-full bg-[#0a0a0a] text-white text-sm rounded-lg px-3 py-2.5 border border-[#333] focus:border-amber-500/50 focus:outline-none" placeholder="يُجلب تلقائياً" value={phone} onChange={e => setPhone(e.target.value)} dir="ltr" />
-              </div>
-              <div>
-                <label className="block text-sm text-neutral-400 mb-1">API ID (اختياري)</label>
-                <input type="text" className="w-full bg-[#0a0a0a] text-white text-sm rounded-lg px-3 py-2.5 border border-[#333] focus:border-amber-500/50 focus:outline-none" placeholder="افتراضي" value={apiId} onChange={e => setApiId(e.target.value)} dir="ltr" />
-              </div>
-              <div>
-                <label className="block text-sm text-neutral-400 mb-1">API Hash (اختياري)</label>
-                <input type="text" className="w-full bg-[#0a0a0a] text-white text-sm rounded-lg px-3 py-2.5 border border-[#333] focus:border-amber-500/50 focus:outline-none" placeholder="افتراضي" value={apiHash} onChange={e => setApiHash(e.target.value)} dir="ltr" />
-              </div>
+            <div>
+              <label className="block text-sm text-neutral-400 mb-1">📱 الرقم (اختياري)</label>
+              <input type="tel" className="w-full bg-[#0a0a0a] text-white text-sm rounded-lg px-3 py-2.5 border border-[#333] focus:border-amber-500/50 focus:outline-none" placeholder="يُجلب تلقائياً من الجلسة" value={phone} onChange={e => setPhone(e.target.value)} dir="ltr" />
             </div>
 
             <button
