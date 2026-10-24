@@ -160,14 +160,15 @@ export async function importSession(
   } catch (e: any) {
     return { ok: false, error: e.message?.substring(0, 250) || "فشل التحقق من الجلسة" };
   } finally {
-    try { await client.disconnect(); } catch {}
+    try { await client.disconnect(); } catch (e: any) { /* ignore */ }
   }
 }
 
 // ─── Scrape helpers ──────────────────────────────────────
 export async function scrapeGroupMembers(client: TelegramClient, groupInput: string, limit: number = 100) {
   try {
-    const entity = await client.getEntity(groupInput);
+    // استخدم resolveChannelEntity لدعم الروابط الخاصة أيضاً
+    const entity = await resolveChannelEntity(client, groupInput);
     const participants = await client.getParticipants(entity, { limit });
     return participants.map((p: any) => ({
       id: String(p.id),
@@ -185,13 +186,105 @@ export async function scrapeGroupMembers(client: TelegramClient, groupInput: str
 }
 
 // ─── Add helpers ─────────────────────────────────────────
+
+/**
+ * يحوّل أي رابط/يوزر لمجموعة إلى InputChannel جاهز للاستخدام.
+ * - للروابط الخاصة (+abc): ينضم أولاً ثم يحلّ
+ * - للـ @usernames: يحلّ مباشرة
+ * - لـ t.me/+hash: ينضم ثم يحلّ
+ * - لـ IDs: يحاول resolve مباشرة
+ *
+ * @returns InputChannel | Entity (channel-like)
+ */
+export async function resolveChannelEntity(client: TelegramClient, input: string): Promise<any> {
+  const trimmed = (input || "").trim();
+  if (!trimmed) throw new Error("رابط فارغ");
+
+  // محاولة 1: resolve مباشر (للـ @usernames والـ IDs والروابط العادية)
+  try {
+    const entity = await client.getEntity(trimmed);
+    return entity;
+  } catch (e1: any) {
+    const msg1 = e1.message || "";
+
+    // محاولة 2: لو رابط دعوة خاص (t.me/+hash) → join ثم resolve
+    if (trimmed.includes("t.me/+") || trimmed.includes("t.me/joinchat/")) {
+      let hash = "";
+      if (trimmed.includes("t.me/+")) {
+        hash = trimmed.split("t.me/+")[1]?.split(/[?\s]/)[0] || "";
+      } else if (trimmed.includes("t.me/joinchat/")) {
+        hash = trimmed.split("t.me/joinchat/")[1]?.split(/[?\s]/)[0] || "";
+      }
+
+      if (hash) {
+        // محاولة الانضمام (لو منضم بالفعل سيعطي خطأ نتجاهله)
+        try {
+          await client.invoke(new Api.messages.ImportChatInvite({ hash }));
+        } catch (joinErr: any) {
+          // تجاهل: "USER_ALREADY_PARTICIPANT" أو غيره
+        }
+
+        // انتظر قليلاً ثم حاول resolve مرة أخرى
+        await new Promise(r => setTimeout(r, 1500));
+
+        // ابحث عن أحدث قروب خاص انضممنا إليه
+        try {
+          const dialogs = await client.getDialogs({ limit: 50 });
+          const recent = (dialogs as any[]).find(d =>
+            d.entity && (
+              (d.entity.className === "Chat" && d.entity.left !== true) ||
+              d.entity.className === "Channel"
+            )
+          );
+          if (recent?.entity) return recent.entity;
+        } catch (e3: any) {
+          // ignore
+        }
+
+        // محاولة أخيرة: getEntity بعد الـ join
+        try {
+          const entity2 = await client.getEntity(trimmed);
+          return entity2;
+        } catch (e4: any) {
+          // ignore
+        }
+
+        throw new Error(`تعذّر الوصول للمجموعة الخاصة. تأكد أن الرابط صالح وأن حسابك ليس محظوراً. التفاصيل: ${msg1.substring(0, 80)}`);
+      }
+    }
+
+    // محاولة 3: استخراج username من الرابط (لو t.me/username)
+    if (trimmed.includes("t.me/")) {
+      const username = trimmed.split("t.me/")[1]?.split(/[?/\s]/)[0];
+      if (username && !username.startsWith("+")) {
+        try {
+          const entity = await client.getEntity(`@${username}`);
+          return entity;
+        } catch (e2: any) {
+          throw new Error(`تعذّر حلّ الكيان: ${e2.message?.substring(0, 80)}`);
+        }
+      }
+    }
+
+    throw new Error(`تعذّر الوصول للمجموعة: ${msg1.substring(0, 80)}`);
+  }
+}
+
+/**
+ * إضافة عضو واحد لمجموعة (يقبل target كـ entity جاهز لتفادي getEntity المتكرر).
+ */
 export async function addSingleMember(
   client: TelegramClient,
-  targetGroup: string,
+  targetGroup: any, //可以是 string أو entity جاهز
   user: { id: string; access_hash?: string }
 ) {
   try {
-    const target = await client.getEntity(targetGroup);
+    // حلّ الـ target مرة واحدة (لو string) أو استخدم entity جاهز
+    let target: any = targetGroup;
+    if (typeof targetGroup === "string") {
+      target = await resolveChannelEntity(client, targetGroup);
+    }
+
     let inputUser: any;
 
     // Try access_hash first
@@ -202,11 +295,15 @@ export async function addSingleMember(
       });
     } else {
       // Resolve fresh via getEntity
-      const entity = await client.getEntity(BigInt(user.id) as any);
-      inputUser = new Api.InputUser({
-        userId: BigInt(user.id) as any,
-        accessHash: (entity as any).accessHash || BigInt(0) as any,
-      });
+      try {
+        const entity = await client.getEntity(BigInt(user.id) as any);
+        inputUser = new Api.InputUser({
+          userId: BigInt(user.id) as any,
+          accessHash: (entity as any).accessHash || BigInt(0) as any,
+        });
+      } catch (e: any) {
+        return { ok: false, status: "skip", reason: "تعذّر حلّ المستخدم" };
+      }
     }
 
     await client.invoke(
@@ -226,6 +323,11 @@ export async function addSingleMember(
     }
     if (msg.includes("CHAT_ADMIN_REQUIRED")) return { ok: false, status: "skip", reason: "تتطلب صلاحية أدمن" };
     if (msg.includes("CHAT_WRITE_FORBIDDEN")) return { ok: false, status: "skip", reason: "لا صلاحية كتابة" };
+    if (msg.includes("USER_NOT_MUTUAL_CONTACT")) return { ok: false, status: "skip", reason: "ليس جهة اتصال متبادلة" };
+    if (msg.includes("USER_ID_INVALID")) return { ok: false, status: "skip", reason: "معرّف مستخدم غير صالح" };
+    if (msg.includes("BOT_METHOD_INVALID")) return { ok: false, status: "skip", reason: "لا يمكن إضافة بوت" };
+    if (msg.includes("INPUT_USER_DEACTIVATED")) return { ok: false, status: "skip", reason: "حساب محذوف" };
+    if (msg.includes("PEER_ID_INVALID")) return { ok: false, status: "skip", reason: "معرّف القروب غير صالح" };
     return { ok: false, status: "error", reason: msg.substring(0, 80) };
   }
 }

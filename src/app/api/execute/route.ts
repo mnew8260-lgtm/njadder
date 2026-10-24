@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, ensureSchema, BlacklistService } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { buildClient, scrapeGroupMembers, addSingleMember, smartDelay } from "@/lib/telegram";
+import { buildClient, scrapeGroupMembers, addSingleMember, smartDelay, resolveChannelEntity } from "@/lib/telegram";
 import { getCommandByKey, Command } from "@/lib/commands";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 
@@ -350,27 +350,37 @@ async function executeCommand(
     // ═══════════════════════════════════════════════════════
     if (cmd.category === "adders") {
       // 🎯 دعم أسماء حقول متعددة
-      const target = params.targetGroup || params.target || params.destinationGroup || "";
-      const source = params.sourceGroup || params.source || "";
+      const targetInput = params.targetGroup || params.target || params.destinationGroup || "";
+      const sourceInput = params.sourceGroup || params.source || "";
       const userListRaw = params.userList || params.inputFile || params.membersList || params.phonesList || "";
       const count = Number(params.count || params.limit || 50);
       const delay = Number(params.delay || 3);
-      if (!target) return { ok: false, output: "رابط المجموعة الهدف مطلوب" };
+      if (!targetInput) return { ok: false, output: "رابط المجموعة الهدف مطلوب" };
+
+      // 🎯 حلّ الـ target مرة واحدة (لتفادي getEntity المتكرر + دعم الروابط الخاصة)
+      addLog(`🔗 حلّ رابط المجموعة الهدف: ${targetInput}`);
+      let targetEntity: any;
+      try {
+        targetEntity = await resolveChannelEntity(client, targetInput);
+        addLog(`✓ تم الوصول للمجموعة الهدف`);
+      } catch (e: any) {
+        return { ok: false, output: log.join("\n") + `\n\n❌ تعذّر الوصول للمجموعة الهدف: ${e.message?.substring(0, 150)}` };
+      }
 
       // 🚫 تحميل القائمة السوداء لمستخدم
       const blacklistSet = await BlacklistService.idSet(userId);
       let blacklistedSkipped = 0;
 
       let users: any[] = [];
-      if (source) {
+      if (sourceInput) {
         // مصدر + هدف: سحب من المصدر ثم إضافة للهدف
-        addLog(`📥 سحب من المصدر: ${source}`);
+        addLog(`📥 سحب من المصدر: ${sourceInput}`);
         try {
-          users = await scrapeGroupMembers(client, source, count * 2);
+          users = await scrapeGroupMembers(client, sourceInput, count * 2);
           users = users.filter(u => !u.is_bot && !u.is_deleted).slice(0, count);
           addLog(`✓ سُحب ${users.length} عضو`);
         } catch (e: any) {
-          return { ok: false, output: `❌ فشل السحب من المصدر: ${e.message?.substring(0, 100)}` };
+          return { ok: false, output: log.join("\n") + `\n\n❌ فشل السحب من المصدر: ${e.message?.substring(0, 100)}` };
         }
       } else if (userListRaw) {
         // قائمة مستخدمين جاهزة (CSV: id|access_hash|first_name|last_name|username)
@@ -386,7 +396,7 @@ async function executeCommand(
         }).filter((u: any) => u.id && /^\d+$/.test(u.id));
         addLog(`📋 تم تحميل ${users.length} عضو من القائمة`);
       }
-      if (!users.length) return { ok: false, output: "لا يوجد أعضاء — أدخل مصدراً أو قائمة مستخدمين" };
+      if (!users.length) return { ok: false, output: log.join("\n") + "\n\n❌ لا يوجد أعضاء — أدخل مصدراً أو قائمة مستخدمين" };
 
       // 🚫 فلترة القائمة السوداء
       if (blacklistSet.size > 0) {
@@ -396,11 +406,11 @@ async function executeCommand(
         if (blacklistedSkipped > 0) addLog(`🚫 تم تخطّي ${blacklistedSkipped} معرّف من القائمة السوداء`);
       }
 
-      addLog(`➕ إضافة ${users.length} إلى: ${target}`);
+      addLog(`➕ إضافة ${users.length} إلى المجموعة الهدف`);
       let added = 0, skipped = 0, already = 0, errors = 0;
       const errorDetails: string[] = [];
       for (const u of users) {
-        const result = await addSingleMember(client, target, u);
+        const result = await addSingleMember(client, targetEntity, u);
         if (result.ok) {
           added++;
           addLog(`✓ ${u.first_name || u.username || u.id}`);
