@@ -65,18 +65,25 @@ export default function Home() {
     const LOGIN_CREATE_ONLY = ["login", "loginbycsv", "logintypeone", "logintypetwo"];
     const isLoginCreateCmd = selectedCommand.category === "login" && LOGIN_CREATE_ONLY.includes(selectedCommand.key);
 
-    // 🎯 أوامر السحب: استخدم /api/scrape-multi (متعدد الحسابات)
+    // 🐍 أوامر السحب: استخدم Python Pyrogram bridge (أعلى جودة)
     if (selectedCommand.category === "scrapers") {
       const groupLink = formValues.groupLink || formValues.targetGroup || formValues.sourceGroup || "";
       const count = Number(formValues.count || 100);
       if (!groupLink) { setOutput("❌ أدخل رابط المجموعة"); return; }
+      if (!selectedAccount) { setOutput("❌ اختر حساباً أولاً"); return; }
       setExecuting(true);
-      setOutput("⏳ جاري السحب بحسابات متعددة...");
+      setOutput("🐍 جاري السحب بـ Pyrogram (أعلى جودة)...");
       try {
-        const res = await fetch("/api/scrape-multi", {
+        const res = await fetch("/api/py-bridge", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ groupLink, count, rotateMode: "auto" }),
+          body: JSON.stringify({
+            action: "scrape",
+            accountId: selectedAccount,
+            group_link: groupLink,
+            limit: count,
+            use_messages: selectedCommand.key === "hiddenscraper" || selectedCommand.key === "pvthiddenscraper",
+          }),
         });
         const data = await res.json();
         setOutput(data.output || data.error || "تم");
@@ -85,7 +92,7 @@ export default function Home() {
       return;
     }
 
-    // 🎯 أوامر الإضافة: استخدم /api/add-multi (متعدد الحسابات + rotation)
+    // 🐍 أوامر الإضافة: استخدم Python Pyrogram bridge (أعلى نسبة نجاح)
     if (selectedCommand.category === "adders") {
       const targetGroup = formValues.targetGroup || "";
       const sourceGroup = formValues.sourceGroup || "";
@@ -94,21 +101,22 @@ export default function Home() {
       const delay = Number(formValues.delay || 3);
       if (!targetGroup) { setOutput("❌ أدخل رابط المجموعة الهدف"); return; }
       if (!sourceGroup && !userList) { setOutput("❌ أدخل مصدراً أو قائمة مستخدمين"); return; }
+      if (!selectedAccount) { setOutput("❌ اختر حساباً أولاً"); return; }
       setExecuting(true);
-      setOutput("⏳ جاري الإضافة بحسابات متعددة...");
+      setOutput("🐍 جاري الإضافة بـ Pyrogram + Contact Recycle (أعلى نسبة نجاح)...");
       try {
-        const res = await fetch("/api/add-multi", {
+        const res = await fetch("/api/py-bridge", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            targetGroup,
-            sourceGroup: sourceGroup || undefined,
-            userList: userList || undefined,
+            action: "add",
+            accountId: selectedAccount,
+            target_group: targetGroup,
+            source_group: sourceGroup || undefined,
+            user_list: userList || undefined,
             count,
             delay,
-            rotateMode: "auto",
-            switchOnError: 3,
-            switchOnFlood: true,
+            contact_recycle: true,
           }),
         });
         const data = await res.json();
@@ -116,6 +124,71 @@ export default function Home() {
       } catch (e: any) { setOutput("❌ " + e.message); }
       setExecuting(false);
       return;
+    }
+
+    // 🐍 أوامر Smart Tools: استخدم Python bridge للأوامر الحرجة
+    if (selectedCommand.category === "smart" && ["smartunifiedadder", "scrapehiddenmembers", "deepscrape", "contactrecycle"].includes(selectedCommand.key)) {
+      if (!selectedAccount) { setOutput("❌ اختر حساباً أولاً"); return; }
+
+      if (selectedCommand.key === "smartunifiedadder") {
+        const sourceGroup = formValues.sourceGroup || "";
+        const targetGroup = formValues.targetGroup || "";
+        const count = Number(formValues.count || 50);
+        const delay = Number(formValues.delay || 3);
+        if (!sourceGroup || !targetGroup) { setOutput("❌ المصدر والهدف مطلوبان"); return; }
+        setExecuting(true);
+        setOutput("🐍 الإضافة الذكية بـ Pyrogram...");
+        try {
+          const res = await fetch("/api/py-bridge", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "add", accountId: selectedAccount, target_group: targetGroup, source_group: sourceGroup, count, delay, contact_recycle: true }),
+          });
+          const data = await res.json();
+          setOutput(data.output || data.error || "تم");
+        } catch (e: any) { setOutput("❌ " + e.message); }
+        setExecuting(false);
+        return;
+      }
+
+      if (selectedCommand.key === "scrapehiddenmembers" || selectedCommand.key === "deepscrape") {
+        const groupLink = formValues.groupLink || "";
+        const count = Number(formValues.count || 100);
+        if (!groupLink) { setOutput("❌ رابط المجموعة مطلوب"); return; }
+        setExecuting(true);
+        setOutput("🐍 السحب بـ Pyrogram...");
+        try {
+          const res = await fetch("/api/py-bridge", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "scrape", accountId: selectedAccount, group_link: groupLink, limit: count, use_messages: true }),
+          });
+          const data = await res.json();
+          setOutput(data.output || data.error || "تم");
+        } catch (e: any) { setOutput("❌ " + e.message); }
+        setExecuting(false);
+        return;
+      }
+
+      if (selectedCommand.key === "contactrecycle") {
+        const userList = formValues.userList || "";
+        const targetGroup = formValues.targetGroup || "";
+        const delay = Number(formValues.delay || 3);
+        if (!userList || !targetGroup) { setOutput("❌ القائمة والهدف مطلوبان"); return; }
+        setExecuting(true);
+        setOutput("🐍 Contact Recycle بـ Pyrogram...");
+        try {
+          const res = await fetch("/api/py-bridge", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "add", accountId: selectedAccount, target_group: targetGroup, user_list: userList, count: 999, delay, contact_recycle: true }),
+          });
+          const data = await res.json();
+          setOutput(data.output || data.error || "تم");
+        } catch (e: any) { setOutput("❌ " + e.message); }
+        setExecuting(false);
+        return;
+      }
     }
 
     if (!isLoginCreateCmd && !selectedAccount) {
@@ -384,9 +457,7 @@ export default function Home() {
                 {/* ─── Normal command execution ─── */}
                 {/* Account — مخفي لأوامر السحب والإضافة (تستخدم multi-account تلقائياً)
                     ولأوامر "إنشاء حساب جديد" (login, loginbycsv, logintypeone, logintypetwo) */}
-                {!(selectedCommand.category === "login" && ["login", "loginbycsv", "logintypeone", "logintypetwo"].includes(selectedCommand.key))
-                  && selectedCommand.category !== "scrapers"
-                  && selectedCommand.category !== "adders" && (
+                {!(selectedCommand.category === "login" && ["login", "loginbycsv", "logintypeone", "logintypetwo"].includes(selectedCommand.key)) && (
                   <div className="bg-[#141414] border border-[#1a1a1a] rounded-2xl p-4 mb-4">
                     <label className="block text-sm text-neutral-400 mb-2">📱 الحساب</label>
                     {accounts.length === 0 ? (
@@ -407,14 +478,14 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* تنبيه لأوامر السحب والإضافة: استخدام multi-account */}
+                {/* تنبيه لأوامر السحب والإضافة: استخدام Python Pyrogram */}
                 {(selectedCommand.category === "scrapers" || selectedCommand.category === "adders") && (
-                  <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-3 mb-4 text-xs text-blue-300/80 leading-relaxed">
-                    👥 هذا الأمر يستخدم <strong>كل حساباتك تلقائياً</strong> مع rotation ذكي.
+                  <div className="bg-green-500/5 border border-green-500/20 rounded-2xl p-3 mb-4 text-xs text-green-300/80 leading-relaxed">
+                    🐍 هذا الأمر يستخدم <strong>Pyrogram عبر Python bridge</strong> (أعلى نسبة نجاح).
                     {accounts.length === 0 ? (
-                      <span className="text-red-400 block mt-1">⚠️ لا يوجد حسابات — أضف حسابات من <a href="/multi-accounts" className="underline">صفحة الحسابات المتعددة</a></span>
+                      <span className="text-red-400 block mt-1">⚠️ لا يوجد حسابات — أضف حساباً من <a href="/accounts" className="underline">صفحة الحسابات</a></span>
                     ) : (
-                      <span className="block mt-1">✓ سيستخدم {accounts.length} حساب — <a href="/multi-accounts" className="underline">إدارة الحسابات</a></span>
+                      <span className="block mt-1">✓ سيستخدم الحساب المختار بالأعلى</span>
                     )}
                   </div>
                 )}
@@ -461,8 +532,6 @@ export default function Home() {
                   onClick={executeCommand}
                   disabled={executing
                     || !(selectedCommand.category === "login" && ["login", "loginbycsv", "logintypeone", "logintypetwo"].includes(selectedCommand.key))
-                       && selectedCommand.category !== "scrapers"
-                       && selectedCommand.category !== "adders"
                        && !selectedAccount}
                   className="w-full bg-amber-500 text-black font-bold rounded-xl py-3 hover:bg-amber-400 transition-colors disabled:opacity-50 active:scale-[0.98] mb-4">
                   {executing ? "⏳ جاري التنفيذ..." : "⚡ تنفيذ الأمر"}
