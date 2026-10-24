@@ -986,3 +986,377 @@ export async function getOTPMessages(client: TelegramClient, limit: number = 3):
     throw new Error(e.message?.substring(0, 100));
   }
 }
+
+// ════════════════════════════════════════════════════════════
+// v41 EXTRA HELPERS — Gender + Nearby + BanFilter + More
+// ════════════════════════════════════════════════════════════
+
+/**
+ * كشف الجنس من الاسم (عربي + إنجليزي)
+ * بديل لـ gender-guesser في Pyrogram
+ */
+const MALE_NAMES = new Set([
+  "ahmed","mohammed","mohamed","ali","omar","khaled","youssef","yousef","ibrahim",
+  "abdullah","abdul","saud","faisal","nasser","tamim","salem","hamad","rashid",
+  "hassan","hussein","tariq","bilal","said","faris","majed","waleed","naif",
+  "abdulaziz","turki","mishari","bandar","sultan","rayan","adam","yazan",
+  "zaid","ammar","marwan","ghassan","nidhal","anwar","jaber","dawood","ismail",
+  "yasin","murad","karim","hisham","raed","ayman","sami","nabil","wael",
+  "thamer","bader","essam","fadi","hani","imad","jihad","kamal","loay",
+  "mazen","nizar","osama","qais","rabee","shadi","talal","uthman","wasim",
+  "zuhair","malik","haris","ziyad","muhanad","arraj","bisher","dhiab",
+]);
+
+const FEMALE_NAMES = new Set([
+  "sara","fatima","aisha","maryam","nora","lina","reem","hana","maha",
+  "layla","noor","amal","dina","rana","yara","arwa","joud","sadeem",
+  "lujain","shahad","ghada","mona","rim","lamia","hala","asala","dalal",
+  "abeer","manal","wafa","sahar","moudi","alya","anoud","bshire","dua",
+  "esra","fajr","hadil","ibtisam","jawaher","khawla","latifa","maysa",
+  "najwa","oula","rabab","sumaya","tahani","ulla","wijdan","yara","zahra",
+  "amira","bayan","farha","hind","inam","jumanah","kawthar","liyana",
+]);
+
+export function detectGender(firstName: string): "male" | "female" | "unknown" {
+  const name = (firstName || "").toLowerCase().trim();
+  if (!name) return "unknown";
+
+  // فحص القائمة العربية
+  for (const male of MALE_NAMES) {
+    if (name.includes(male)) return "male";
+  }
+  for (const female of FEMALE_NAMES) {
+    if (name.includes(female)) return "female";
+  }
+
+  // قواعد بسيطة للأسماء الإنجليزية
+  if (/(son|rd|ld|lf|ric|hard|ward|bert|ger|mer|ton|ney|ney)$/.test(name)) return "male";
+  if (/(a|ine|ette|elle|ine|ina|ita|ya|ah|een)$/.test(name) && name.length > 3) return "female";
+
+  return "unknown";
+}
+
+/**
+ * استخراج الأعضاء بالقرب من موقع جغرافي
+ * يعادل nearbyadderlatlong في Pyrogram
+ */
+export async function getNearbyUsers(
+  client: TelegramClient,
+  lat: number,
+  lon: number
+): Promise<any[]> {
+  try {
+    const result = await client.invoke(
+      new Api.contacts.GetLocated({
+        geoPoint: new Api.InputGeoPoint({ lat, long: lon, accuracyRadius: 500 } as any),
+      } as any)
+    );
+    const users = (result as any)?.users || [];
+    return users.map((u: any) => ({
+      id: String(u.id),
+      first_name: u.firstName || "",
+      last_name: u.lastName || "",
+      username: u.username || "",
+      phone: u.phone || "",
+    }));
+  } catch (e: any) {
+    throw new Error(e.message?.substring(0, 150));
+  }
+}
+
+/**
+ * تحويل اسم مدينة إلى إحداثيات (Geocoding)
+ * يعادل Nominatim في Pyrogram
+ */
+export async function geocodeCity(city: string): Promise<{ lat: number; lon: number } | null> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "NJADDER-PRO/1.0" },
+    });
+    const data = await res.json();
+    if (data && data[0]) {
+      return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * استخراج أعضاء بمعلومات كاملة (status + premium + verification)
+ * يعادل fullscraper في Pyrogram
+ */
+export async function scrapeFullMembers(
+  client: TelegramClient,
+  groupInput: string,
+  limit: number = 500
+): Promise<any[]> {
+  try {
+    const entity = await resolveChannelEntity(client, groupInput);
+    const participants = await client.getParticipants(entity, { limit } as any);
+    return (participants as any[]).filter(p => !p.bot && !p.deleted).map(p => ({
+      id: String(p.id),
+      access_hash: String(p.accessHash || ""),
+      first_name: p.firstName || "",
+      last_name: p.lastName || "",
+      username: p.username || "",
+      phone: p.phone || "",
+      is_premium: !!p.isPremium,
+      is_verified: !!p.verified,
+      status: p.status?.className || "unknown",
+      last_online: p.status?.wasOnline ? new Date(p.status.wasOnline * 1000).toISOString() : null,
+    }));
+  } catch (e: any) {
+    throw new Error(e.message?.substring(0, 200));
+  }
+}
+
+/**
+ * إرسال رسالة خاصة (DM) لمستخدم
+ */
+export async function sendDirectMessage(
+  client: TelegramClient,
+  userIdentifier: string,
+  message: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const entity = await client.getEntity(userIdentifier);
+    await client.sendMessage(entity, { message });
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message?.substring(0, 80) };
+  }
+}
+
+/**
+ * نسخ بيانات حساب آخر (اسم + بايو + يوزر)
+ * يعادل autoidcloner في Pyrogram
+ */
+export async function cloneAccount(
+  client: TelegramClient,
+  targetUsername: string
+): Promise<{ ok: boolean; cloned?: any; error?: string }> {
+  try {
+    const target = await client.getEntity(targetUsername);
+    const targetChat = await client.getEntity(targetUsername);
+    const bio = (targetChat as any).about || "";
+
+    await (client as any).updateProfile({
+      firstName: (target as any).firstName || "",
+      lastName: (target as any).lastName || "",
+      about: bio,
+    });
+
+    if ((target as any).username) {
+      try {
+        await client.invoke(new Api.account.UpdateUsername({ username: (target as any).username }));
+      } catch {}
+    }
+
+    return {
+      ok: true,
+      cloned: {
+        firstName: (target as any).firstName || "",
+        lastName: (target as any).lastName || "",
+        bio,
+        username: (target as any).username || "",
+      },
+    };
+  } catch (e: any) {
+    return { ok: false, error: e.message?.substring(0, 80) };
+  }
+}
+
+/**
+ * نسخ رسائل من مجموعة لأخرى (Group Cloner)
+ * يعادل groupchatcloner في Pyrogram
+ */
+export async function cloneGroupMessages(
+  client: TelegramClient,
+  sourceInput: string,
+  targetInput: string,
+  count: number = 50
+): Promise<{ copied: number; errors: string[] }> {
+  let copied = 0;
+  const errors: string[] = [];
+
+  try {
+    const source = await resolveChannelEntity(client, sourceInput);
+    const target = await resolveChannelEntity(client, targetInput);
+
+    const msgs = await client.getMessages(source, { limit: count });
+    // عكس الترتيب (الأقدم أولاً)
+    const reversed = [...(msgs as any[])].reverse();
+
+    for (const m of reversed) {
+      try {
+        await (client as any).copyMessage(target, {
+          fromPeer: source,
+          message: m.id,
+        });
+        copied++;
+        await smartDelay(2);
+      } catch (e: any) {
+        errors.push(`msg ${m.id}: ${e.message?.substring(0, 50)}`);
+      }
+    }
+  } catch (e: any) {
+    errors.push(`general: ${e.message?.substring(0, 80)}`);
+  }
+  return { copied, errors };
+}
+
+/**
+ * استيراد أرقام كجهات اتصال
+ * يعادل addtocontactbyimp في Pyrogram
+ */
+export async function importPhoneContacts(
+  client: TelegramClient,
+  phones: Array<{ phone: string; firstName: string }>
+): Promise<{ imported: number; errors: string[] }> {
+  let imported = 0;
+  const errors: string[] = [];
+
+  const contacts = phones.map(p => {
+    const inputContact = new Api.InputPhoneContact({
+      clientId: Math.floor(Math.random() * 1000000) as any,
+      phone: p.phone,
+      firstName: p.firstName,
+      lastName: "",
+    });
+    return inputContact;
+  });
+
+  // إرسال دفعة واحدة (حد 50 لكل طلب)
+  const batchSize = 50;
+  for (let i = 0; i < contacts.length; i += batchSize) {
+    const batch = contacts.slice(i, i + batchSize);
+    try {
+      const result = await client.invoke(
+        new Api.contacts.ImportContacts({ contacts: batch as any })
+      );
+      imported += (result as any)?.imported?.length || batch.length;
+    } catch (e: any) {
+      errors.push(`batch ${i}: ${e.message?.substring(0, 60)}`);
+    }
+  }
+  return { imported, errors };
+}
+
+/**
+ * حذف كل جهات الاتصال
+ * يعادل contactdeleter في Pyrogram
+ */
+export async function deleteAllContacts(client: TelegramClient): Promise<{ deleted: number }> {
+  try {
+    const contacts = await getContactsList(client);
+    if (contacts.length === 0) return { deleted: 0 };
+
+    const ids = await Promise.all(
+      contacts.map((c: any) => client.getInputEntity(c.id))
+    );
+    await client.invoke(new Api.contacts.DeleteContacts({ id: ids as any }));
+    return { deleted: contacts.length };
+  } catch (e: any) {
+    return { deleted: 0 };
+  }
+}
+
+/**
+ * تحديث البروفايل (اسم + بايو)
+ * يعادل changeraccount في Pyrogram
+ */
+export async function updateProfile(
+  client: TelegramClient,
+  firstName: string,
+  lastName: string = "",
+  bio: string = ""
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await (client as any).updateProfile({ firstName, lastName, about: bio });
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message?.substring(0, 80) };
+  }
+}
+
+/**
+ * تعيين يوزر محدد
+ */
+export async function setUsername(
+  client: TelegramClient,
+  username: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await client.invoke(new Api.account.UpdateUsername({ username }));
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message?.substring(0, 80) };
+  }
+}
+
+/**
+ * مغادرة مجموعة
+ */
+export async function leaveGroup(
+  client: TelegramClient,
+  groupInput: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const entity = await resolveChannelEntity(client, groupInput);
+    await (client as any).deleteDialog(entity);
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message?.substring(0, 80) };
+  }
+}
+
+/**
+ * الانضمام لمجموعة
+ */
+export async function joinGroup(
+  client: TelegramClient,
+  groupInput: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await (client as any).joinChannel(groupInput);
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e.message?.substring(0, 80) };
+  }
+}
+
+/**
+ * إعادة توجيه بدون تاج (Copy)
+ */
+export async function copyMessages(
+  client: TelegramClient,
+  sourceInput: string,
+  targetInput: string,
+  count: number = 10
+): Promise<{ copied: number; errors: string[] }> {
+  let copied = 0;
+  const errors: string[] = [];
+
+  try {
+    const source = await resolveChannelEntity(client, sourceInput);
+    const target = await resolveChannelEntity(client, targetInput);
+    const msgs = await client.getMessages(source, { limit: count });
+    const reversed = [...(msgs as any[])].reverse();
+
+    for (const m of reversed) {
+      try {
+        await (client as any).copyMessage(target, { fromPeer: source, message: m.id });
+        copied++;
+        await smartDelay(1);
+      } catch (e: any) {
+        errors.push(`msg ${m.id}: ${e.message?.substring(0, 50)}`);
+      }
+    }
+  } catch (e: any) {
+    errors.push(`general: ${e.message?.substring(0, 80)}`);
+  }
+  return { copied, errors };
+}

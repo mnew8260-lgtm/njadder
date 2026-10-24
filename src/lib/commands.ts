@@ -168,7 +168,7 @@ export const CATEGORIES: Category[] = [
     "nameEn": "Smart Tools v41",
     "icon": "Zap",
     "accent": "#f59e0b",
-    "range": "139-155",
+    "range": "139-175",
     "order": 15
   }
 ];
@@ -3816,6 +3816,169 @@ export const COMMANDS: Command[] = [
     "fields": [],
     "pyFn": "full_account_info()",
     "risk": "low"
+  },
+  // ═══ v41 EXTRA — Gender + Nearby + BanFilter + Messaging + Contacts + More ═══
+  {
+    "id": 156, "key": "maleadderv2", "nameAr": "👨 إضافة ذكور (ذكي)", "nameEn": "Male Adder v2",
+    "category": "smart", "icon": "UserCheck", "description": "إضافة الذكور فقط (كشف بالاسم العربي/الإنجليزي).",
+    "fields": [
+      { "name": "sourceGroup", "label": "رابط المصدر", "type": "text", "placeholder": "@source", "required": true },
+      { "name": "targetGroup", "label": "رابط الهدف", "type": "text", "placeholder": "@target", "required": true },
+      { "name": "count", "label": "عدد الأعضاء", "type": "number", "placeholder": "50", "required": false, "default": 50 },
+      { "name": "delay", "label": "التأخير", "type": "number", "placeholder": "3", "required": false, "default": 3 }
+    ], "pyFn": "maleadderh()", "risk": "high"
+  },
+  {
+    "id": 157, "key": "femaleadderv2", "nameAr": "👩 إضافة إناث (ذكي)", "nameEn": "Female Adder v2",
+    "category": "smart", "icon": "UserHeart", "description": "إضافة الإناث فقط (كشف بالاسم العربي/الإنجليزي).",
+    "fields": [
+      { "name": "sourceGroup", "label": "رابط المصدر", "type": "text", "placeholder": "@source", "required": true },
+      { "name": "targetGroup", "label": "رابط الهدف", "type": "text", "placeholder": "@target", "required": true },
+      { "name": "count", "label": "عدد الأعضاء", "type": "number", "placeholder": "50", "required": false, "default": 50 },
+      { "name": "delay", "label": "التأخير", "type": "number", "placeholder": "3", "required": false, "default": 3 }
+    ], "pyFn": "femaleadderh()", "risk": "high"
+  },
+  {
+    "id": 158, "key": "nearbylatlng", "nameAr": "📍 إضافة بالقرب (إحداثيات)", "nameEn": "Nearby by Lat/Lng",
+    "category": "smart", "icon": "MapPin", "description": "البحث عن المستخدمين بالقرب من إحداثيات جغرافية.",
+    "fields": [
+      { "name": "latitude", "label": "خط العرض (Latitude)", "type": "text", "placeholder": "24.7136", "required": true },
+      { "name": "longitude", "label": "خط الطول (Longitude)", "type": "text", "placeholder": "46.6753", "required": true },
+      { "name": "targetGroup", "label": "رابط المجموعة الهدف", "type": "text", "placeholder": "@target", "required": true },
+      { "name": "count", "label": "عدد الأعضاء", "type": "number", "placeholder": "50", "required": false, "default": 50 },
+      { "name": "delay", "label": "التأخير", "type": "number", "placeholder": "3", "required": false, "default": 3 }
+    ], "pyFn": "nearbyadderlatlong()", "risk": "high"
+  },
+  {
+    "id": 159, "key": "nearbycity", "nameAr": "🏙️ إضافة بالقرب (مدينة)", "nameEn": "Nearby by City",
+    "category": "smart", "icon": "Building", "description": "البحث عن المستخدمين بالقرب من مدينة محددة.",
+    "fields": [
+      { "name": "city", "label": "اسم المدينة", "type": "text", "placeholder": "Riyadh, Saudi Arabia", "required": true },
+      { "name": "targetGroup", "label": "رابط المجموعة الهدف", "type": "text", "placeholder": "@target", "required": true },
+      { "name": "count", "label": "عدد الأعضاء", "type": "number", "placeholder": "50", "required": false, "default": 50 },
+      { "name": "delay", "label": "التأخير", "type": "number", "placeholder": "3", "required": false, "default": 3 }
+    ], "pyFn": "nearbyaddercity()", "risk": "high"
+  },
+  {
+    "id": 160, "key": "banfilter", "nameAr": "🔍 فاحص الحسابات الذكي", "nameEn": "Smart Ban Filter",
+    "category": "smart", "icon": "ShieldCheck", "description": "فحص حالة الحساب: نظيف/مقيّد/محظور عبر @SpamBot.",
+    "fields": [], "pyFn": "BanFilter()", "risk": "low"
+  },
+  {
+    "id": 161, "key": "massdmv2", "nameAr": "📨 رسائل خاصة جماعية", "nameEn": "Mass DM v2",
+    "category": "smart", "icon": "Mail", "description": "إرسال رسالة خاصة لقائمة مستخدمين (من CSV).",
+    "fields": [
+      { "name": "userList", "label": "قائمة المستخدمين (CSV)", "type": "textarea", "placeholder": "id|hash|name||@username", "required": true },
+      { "name": "message", "label": "الرسالة", "type": "textarea", "placeholder": "اكتب رسالتك...", "required": true },
+      { "name": "delay", "label": "التأخير", "type": "number", "placeholder": "5", "required": false, "default": 5 }
+    ], "pyFn": "massdm()", "risk": "high"
+  },
+  {
+    "id": 162, "key": "pmspam", "nameAr": "💣 سبام لمستخدم واحد", "nameEn": "PM Spam",
+    "category": "smart", "icon": "Send", "description": "إرسال رسالة لمستخدم واحد عدة مرات.",
+    "fields": [
+      { "name": "username", "label": "اليوزر أو ID", "type": "text", "placeholder": "@username", "required": true },
+      { "name": "message", "label": "الرسالة", "type": "textarea", "placeholder": "...", "required": true },
+      { "name": "count", "label": "عدد المرات", "type": "number", "placeholder": "5", "required": false, "default": 5 },
+      { "name": "delay", "label": "التأخير", "type": "number", "placeholder": "3", "required": false, "default": 3 }
+    ], "pyFn": "pmspamdm()", "risk": "high"
+  },
+  {
+    "id": 163, "key": "contactstogroup", "nameAr": "📇 جهات الاتصال → مجموعة", "nameEn": "Contacts to Group",
+    "category": "smart", "icon": "Contact", "description": "إضافة كل جهات اتصالك لمجموعة محددة.",
+    "fields": [
+      { "name": "targetGroup", "label": "رابط المجموعة الهدف", "type": "text", "placeholder": "@target", "required": true },
+      { "name": "count", "label": "حد لكل عملية", "type": "number", "placeholder": "50", "required": false, "default": 50 },
+      { "name": "delay", "label": "التأخير", "type": "number", "placeholder": "3", "required": false, "default": 3 }
+    ], "pyFn": "contacts_to_group()", "risk": "high"
+  },
+  {
+    "id": 164, "key": "groupcloner", "nameAr": "📋 استنساخ رسائل مجموعة", "nameEn": "Group Cloner",
+    "category": "smart", "icon": "Copy", "description": "نسخ رسائل من مجموعة مصدر إلى مجموعة هدف.",
+    "fields": [
+      { "name": "sourceGroup", "label": "رابط المصدر", "type": "text", "placeholder": "@source", "required": true },
+      { "name": "targetGroup", "label": "رابط الهدف", "type": "text", "placeholder": "@target", "required": true },
+      { "name": "count", "label": "عدد الرسائل", "type": "number", "placeholder": "50", "required": false, "default": 50 }
+    ], "pyFn": "groupchatcloner()", "risk": "medium"
+  },
+  {
+    "id": 165, "key": "importcontacts", "nameAr": "📥 استيراد أرقام كجهات اتصال", "nameEn": "Import Contacts",
+    "category": "smart", "icon": "Upload", "description": "استيراد قائمة أرقام هاتف كجهات اتصال.",
+    "fields": [
+      { "name": "phonesList", "label": "قائمة الأرقام (سطر لكل رقم)", "type": "textarea", "placeholder": "+9665XXXXXXXX", "required": true }
+    ], "pyFn": "addtocontactbyimp()", "risk": "medium"
+  },
+  {
+    "id": 166, "key": "deleteallcontacts", "nameAr": "🗑️ حذف كل جهات الاتصال", "nameEn": "Delete All Contacts",
+    "category": "smart", "icon": "Trash2", "description": "حذف كل جهات الاتصال من الحساب.",
+    "fields": [], "pyFn": "contactdeleter()", "risk": "low"
+  },
+  {
+    "id": 167, "key": "accountcloner", "nameAr": "🎭 استنساخ حساب", "nameEn": "Account Cloner",
+    "category": "smart", "icon": "Copy", "description": "نسخ اسم وبايو ويوزر حساب آخر.",
+    "fields": [
+      { "name": "targetUser", "label": "اليوزر أو ID المستهدف", "type": "text", "placeholder": "@username_to_clone", "required": true }
+    ], "pyFn": "autoidcloner()", "risk": "medium"
+  },
+  {
+    "id": 168, "key": "updateprofile", "nameAr": "✏️ تحديث الاسم والبايو", "nameEn": "Update Profile",
+    "category": "smart", "icon": "Edit", "description": "تحديث الاسم الأول والأخير والبايو.",
+    "fields": [
+      { "name": "firstName", "label": "الاسم الأول", "type": "text", "placeholder": "", "required": true },
+      { "name": "lastName", "label": "الاسم الأخير", "type": "text", "placeholder": "", "required": false },
+      { "name": "bio", "label": "البايو", "type": "text", "placeholder": "", "required": false }
+    ], "pyFn": "changeraccount()", "risk": "low"
+  },
+  {
+    "id": 169, "key": "setusername", "nameAr": "📛 تعيين يوزر", "nameEn": "Set Username",
+    "category": "smart", "icon": "AtSign", "description": "تعيين يوزر محدد للحساب.",
+    "fields": [
+      { "name": "username", "label": "اليوزر (بدون @)", "type": "text", "placeholder": "my_username", "required": true }
+    ], "pyFn": "changerusername()", "risk": "low"
+  },
+  {
+    "id": 170, "key": "forwardnotag", "nameAr": "📋 نسخ بدون تاج", "nameEn": "Copy (No Tag)",
+    "category": "smart", "icon": "Copy", "description": "نسخ رسائل من مصدر لهدف بدون علامة Forward.",
+    "fields": [
+      { "name": "sourceGroup", "label": "رابط المصدر", "type": "text", "placeholder": "@source", "required": true },
+      { "name": "targetGroup", "label": "رابط الهدف", "type": "text", "placeholder": "@target", "required": true },
+      { "name": "count", "label": "عدد الرسائل", "type": "number", "placeholder": "10", "required": false, "default": 10 }
+    ], "pyFn": "forward_to_channelsnotag()", "risk": "low"
+  },
+  {
+    "id": 171, "key": "hideboth", "nameAr": "🙈 إخفاء الظهور والهاتف", "nameEn": "Hide Both",
+    "category": "smart", "icon": "EyeOff", "description": "إخفاء آخر ظهور ورقم الهاتف معاً.",
+    "fields": [], "pyFn": "hidenmbandphone()", "risk": "low"
+  },
+  {
+    "id": 172, "key": "fullscraperv2", "nameAr": "📊 استخراج شامل بمعلومات", "nameEn": "Full Scraper v2",
+    "category": "smart", "icon": "ScanLine", "description": "استخراج بيانات كاملة: ID، اسم، يوزر، بريميوم، حالة، آخر ظهور.",
+    "fields": [
+      { "name": "groupLink", "label": "رابط المجموعة", "type": "text", "placeholder": "@username", "required": true },
+      { "name": "count", "label": "عدد الأعضاء", "type": "number", "placeholder": "500", "required": false, "default": 500 }
+    ], "pyFn": "fullscraper()", "risk": "low"
+  },
+  {
+    "id": 173, "key": "reportspamuser", "nameAr": "🚨 بلاغ مستخدم (سبام)", "nameEn": "Report User Spam",
+    "category": "smart", "icon": "Flag", "description": "إرسال بلاغ سبام عن مستخدم محدد.",
+    "fields": [
+      { "name": "username", "label": "اليوزر أو ID", "type": "text", "placeholder": "@username", "required": true },
+      { "name": "message", "label": "رسالة البلاغ", "type": "text", "placeholder": "Spam report", "required": false, "default": "Spam" }
+    ], "pyFn": "reportspamuser()", "risk": "medium"
+  },
+  {
+    "id": 174, "key": "scamtag", "nameAr": "🏷️ إرسال لـ SpamBot", "nameEn": "Scam Tag",
+    "category": "smart", "icon": "Tag", "description": "إرسال رسالة بلاغ لـ @SpamBot.",
+    "fields": [
+      { "name": "message", "label": "الرسالة", "type": "textarea", "placeholder": "Report message...", "required": true }
+    ], "pyFn": "ScamTag()", "risk": "medium"
+  },
+  {
+    "id": 175, "key": "sendscamreport", "nameAr": "📨 إرسال لـ notoscam", "nameEn": "Send Scam Report",
+    "category": "smart", "icon": "Send", "description": "إرسال بلاغ لـ @notoscam.",
+    "fields": [
+      { "name": "message", "label": "الرسالة", "type": "textarea", "placeholder": "Report message...", "required": true }
+    ], "pyFn": "sendscamreport()", "risk": "medium"
   }
 ];
 

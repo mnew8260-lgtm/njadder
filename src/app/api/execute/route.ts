@@ -8,7 +8,11 @@ import {
   checkSpamBotStatus, submitSpamBotComplaint,
   sendToMultipleGroups, forwardMessages, sendReaction, incrementViews,
   hideLastSeen, hidePhoneNumber, setRandomUsername,
-  reportChannel, createSupergroup, getFullAccountInfo, getOTPMessages
+  reportChannel, createSupergroup, getFullAccountInfo, getOTPMessages,
+  detectGender, getNearbyUsers, geocodeCity, scrapeFullMembers,
+  sendDirectMessage, cloneAccount, cloneGroupMessages,
+  importPhoneContacts, deleteAllContacts, updateProfile, setUsername,
+  leaveGroup, joinGroup, copyMessages, getContactsList
 } from "@/lib/telegram";
 import { getCommandByKey, Command } from "@/lib/commands";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
@@ -1050,6 +1054,266 @@ async function executeCommand(
           } catch (e: any) {
             return { ok: false, output: `❌ ${e.message?.substring(0, 100)}` };
           }
+        }
+
+        case "maleadderv2":
+        case "femaleadderv2": {
+          const source = params.sourceGroup || "";
+          const target = params.targetGroup || "";
+          const count = Number(params.count || 50);
+          const delay = Number(params.delay || 3);
+          const wantGender = cmd.key === "maleadderv2" ? "male" : "female";
+          if (!source || !target) return { ok: false, output: "المصدر والهدف مطلوبان" };
+          addLog(`👨‍👩 كشف الجنس: ${wantGender === "male" ? "ذكور" : "إناث"} فقط`);
+          let users: any[] = [];
+          try { users = await scrapeGroupMembers(client, source, count * 3); } catch (e: any) {
+            return { ok: false, output: `❌ فشل السحب: ${e.message?.substring(0, 80)}` };
+          }
+          const filtered = users.filter(u => detectGender(u.first_name) === wantGender);
+          addLog(`📊 سُحب ${users.length} | ${wantGender === "male" ? "ذكور" : "إناث"}: ${filtered.length}`);
+          if (!filtered.length) return { ok: false, output: `❌ لا يوجد ${wantGender === "male" ? "ذكور" : "إناث"}` };
+          let targetEntity: any;
+          try { targetEntity = await resolveChannelEntity(client, target); } catch (e: any) {
+            return { ok: false, output: `❌ تعذّر الوصول للهدف: ${e.message?.substring(0, 80)}` };
+          }
+          let added = 0, errors = 0;
+          for (const u of filtered.slice(0, count)) {
+            const result = await smartContactRecycle(client, targetEntity, u);
+            if (result.status === "added" || result.status === "ok") { added++; addLog(`✓ ${u.first_name}`); }
+            else { errors++; }
+            await smartDelay(delay);
+          }
+          addLog(`\n📊 ✓ ${added} أُضيف | ❌ ${errors} خطأ`);
+          return { ok: true, output: log.join("\n") };
+        }
+
+        case "nearbylatlng": {
+          const lat = Number(params.latitude || 0);
+          const lon = Number(params.longitude || 0);
+          const target = params.targetGroup || "";
+          const count = Number(params.count || 50);
+          const delay = Number(params.delay || 3);
+          if (!lat || !lon || !target) return { ok: false, output: "الإحداثيات والهدف مطلوبة" };
+          addLog(`📍 البحث بالقرب من: ${lat}, ${lon}`);
+          let nearbyUsers: any[];
+          try { nearbyUsers = await getNearbyUsers(client, lat, lon); } catch (e: any) {
+            return { ok: false, output: `❌ ${e.message?.substring(0, 100)}` };
+          }
+          addLog(`✓ وُجد ${nearbyUsers.length} مستخدم قريب`);
+          let targetEntity: any;
+          try { targetEntity = await resolveChannelEntity(client, target); } catch (e: any) {
+            return { ok: false, output: `❌ تعذّر الوصول للهدف: ${e.message?.substring(0, 80)}` };
+          }
+          let added = 0;
+          for (const u of nearbyUsers.slice(0, count)) {
+            const result = await addSingleMember(client, targetEntity, u);
+            if (result.ok) { added++; addLog(`✓ ${u.first_name || u.id}`); }
+            await smartDelay(delay);
+          }
+          addLog(`\n📊 ✓ ${added} أُضيف`);
+          return { ok: true, output: log.join("\n") };
+        }
+
+        case "nearbycity": {
+          const city = params.city || "";
+          const target = params.targetGroup || "";
+          const count = Number(params.count || 50);
+          const delay = Number(params.delay || 3);
+          if (!city || !target) return { ok: false, output: "المدينة والهدف مطلوبان" };
+          addLog(`🏙️ تحويل "${city}" إلى إحداثيات...`);
+          const coords = await geocodeCity(city);
+          if (!coords) return { ok: false, output: `❌ تعذّر العثور على إحداثيات "${city}"` };
+          addLog(`✓ ${coords.lat}, ${coords.lon}`);
+          let nearbyUsers: any[];
+          try { nearbyUsers = await getNearbyUsers(client, coords.lat, coords.lon); } catch (e: any) {
+            return { ok: false, output: `❌ ${e.message?.substring(0, 100)}` };
+          }
+          addLog(`✓ وُجد ${nearbyUsers.length} مستخدم قريب`);
+          let targetEntity: any;
+          try { targetEntity = await resolveChannelEntity(client, target); } catch (e: any) {
+            return { ok: false, output: `❌ تعذّر الوصول للهدف: ${e.message?.substring(0, 80)}` };
+          }
+          let added = 0;
+          for (const u of nearbyUsers.slice(0, count)) {
+            const result = await addSingleMember(client, targetEntity, u);
+            if (result.ok) { added++; addLog(`✓ ${u.first_name || u.id}`); }
+            await smartDelay(delay);
+          }
+          addLog(`\n📊 ✓ ${added} أُضيف`);
+          return { ok: true, output: log.join("\n") };
+        }
+
+        case "banfilter": {
+          addLog("🔍 فحص حالة الحساب...");
+          const status = await checkSpamBotStatus(client);
+          const statusText = status === "clean" ? "✅ نظيف — لا قيود"
+            : status === "restricted" ? "⚠️ مقيّد — يحتاج رفع قيد"
+            : status === "banned" ? "🚫 محظور — لا يمكن الاستخدام"
+            : "❓ غير معروف";
+          addLog(`الحالة: ${statusText}`);
+          return { ok: true, output: log.join("\n") };
+        }
+
+        case "massdmv2": {
+          const userList = params.userList || "";
+          const message = params.message || "";
+          const delay = Number(params.delay || 5);
+          if (!userList || !message) return { ok: false, output: "القائمة والرسالة مطلوبة" };
+          const users = String(userList).split("\n").map((line: string) => {
+            const parts = line.split("|").map(p => p.trim());
+            return { id: parts[0], username: parts[4] || "" };
+          }).filter((u: any) => u.id || u.username);
+          addLog(`📨 إرسال DM لـ ${users.length} مستخدم`);
+          let sent = 0, errors = 0;
+          for (const u of users) {
+            const target = u.username || u.id;
+            const result = await sendDirectMessage(client, target, message);
+            if (result.ok) { sent++; addLog(`✓ ${target}`); }
+            else { errors++; addLog(`✗ ${target}: ${result.error}`); }
+            await smartDelay(delay);
+          }
+          addLog(`\n📊 ✓ ${sent} مُرسلة | ❌ ${errors} خطأ`);
+          return { ok: true, output: log.join("\n") };
+        }
+
+        case "pmspam": {
+          const username = params.username || "";
+          const message = params.message || "";
+          const count = Number(params.count || 5);
+          const delay = Number(params.delay || 3);
+          if (!username || !message) return { ok: false, output: "اليوزر والرسالة مطلوبة" };
+          addLog(`💣 سبام ${count} مرة لـ ${username}`);
+          let sent = 0;
+          for (let i = 0; i < count; i++) {
+            const result = await sendDirectMessage(client, username, message);
+            if (result.ok) { sent++; addLog(`✓ ${i + 1}/${count}`); }
+            else { addLog(`✗ ${result.error}`); break; }
+            await smartDelay(delay);
+          }
+          addLog(`\n📊 ✓ ${sent}/${count} مُرسلة`);
+          return { ok: true, output: log.join("\n") };
+        }
+
+        case "contactstogroup": {
+          const target = params.targetGroup || "";
+          const count = Number(params.count || 50);
+          const delay = Number(params.delay || 3);
+          if (!target) return { ok: false, output: "الهدف مطلوب" };
+          addLog("📇 سحب جهات الاتصال...");
+          const contacts = await getContactsList(client);
+          addLog(`✓ ${contacts.length} جهة اتصال`);
+          let targetEntity: any;
+          try { targetEntity = await resolveChannelEntity(client, target); } catch (e: any) {
+            return { ok: false, output: `❌ تعذّر الوصول للهدف: ${e.message?.substring(0, 80)}` };
+          }
+          let added = 0;
+          for (const c of contacts.slice(0, count)) {
+            const result = await addSingleMember(client, targetEntity, { id: String(c.id), first_name: c.firstName || "" });
+            if (result.ok) { added++; addLog(`✓ ${c.firstName || c.id}`); }
+            await smartDelay(delay);
+          }
+          addLog(`\n📊 ✓ ${added} أُضيف`);
+          return { ok: true, output: log.join("\n") };
+        }
+
+        case "groupcloner": {
+          const source = params.sourceGroup || "";
+          const target = params.targetGroup || "";
+          const count = Number(params.count || 50);
+          if (!source || !target) return { ok: false, output: "المصدر والهدف مطلوبان" };
+          addLog(`📋 نسخ ${count} رسالة`);
+          const result = await cloneGroupMessages(client, source, target, count);
+          addLog(`\n📊 ✓ ${result.copied} رسالة منسوخة`);
+          if (result.errors.length > 0) addLog(`\n--- أخطاء ---\n${result.errors.slice(0, 10).join("\n")}`);
+          return { ok: true, output: log.join("\n") };
+        }
+
+        case "importcontacts": {
+          const phonesRaw = params.phonesList || "";
+          if (!phonesRaw) return { ok: false, output: "قائمة الأرقام مطلوبة" };
+          const phones = phonesRaw.split("\n").map((p: string) => p.trim()).filter(Boolean).map((p: string) => ({
+            phone: p, firstName: "Contact" + Math.floor(Math.random() * 1000),
+          }));
+          addLog(`📥 استيراد ${phones.length} رقم...`);
+          const result = await importPhoneContacts(client, phones);
+          addLog(`\n📊 ✓ ${result.imported} مستورد`);
+          return { ok: true, output: log.join("\n") };
+        }
+
+        case "deleteallcontacts": {
+          addLog("🗑️ حذف كل جهات الاتصال...");
+          const result = await deleteAllContacts(client);
+          addLog(`✓ تم حذف ${result.deleted} جهة اتصال`);
+          return { ok: true, output: log.join("\n") };
+        }
+
+        case "accountcloner": {
+          const targetUser = params.targetUser || "";
+          if (!targetUser) return { ok: false, output: "المستهدف مطلوب" };
+          addLog(`🎭 استنساخ ${targetUser}...`);
+          const result = await cloneAccount(client, targetUser);
+          if (result.ok) return { ok: true, output: `✓ تم الاستنساخ:\nالاسم: ${result.cloned.firstName} ${result.cloned.lastName}\nالبايو: ${result.cloned.bio}\nاليوزر: @${result.cloned.username}` };
+          return { ok: false, output: `❌ ${result.error}` };
+        }
+
+        case "updateprofile": {
+          const result = await updateProfile(client, params.firstName || "", params.lastName || "", params.bio || "");
+          return result.ok ? { ok: true, output: `✓ تم التحديث: ${params.firstName} ${params.lastName}` } : { ok: false, output: `❌ ${result.error}` };
+        }
+
+        case "setusername": {
+          const result = await setUsername(client, params.username || "");
+          return result.ok ? { ok: true, output: `✓ اليوزر: @${params.username}` } : { ok: false, output: `❌ ${result.error}` };
+        }
+
+        case "forwardnotag": {
+          const source = params.sourceGroup || "";
+          const target = params.targetGroup || "";
+          const count = Number(params.count || 10);
+          if (!source || !target) return { ok: false, output: "المصدر والهدف مطلوبان" };
+          addLog(`📋 نسخ بدون تاج ${count} رسالة`);
+          const result = await copyMessages(client, source, target, count);
+          addLog(`\n📊 ✓ ${result.copied} رسالة منسوخة`);
+          return { ok: true, output: log.join("\n") };
+        }
+
+        case "hideboth": {
+          const r1 = await hideLastSeen(client);
+          const r2 = await hidePhoneNumber(client);
+          return (r1.ok && r2.ok) ? { ok: true, output: "✓ تم إخفاء الظهور والهاتف" } : { ok: false, output: `❌ ${r1.error || r2.error}` };
+        }
+
+        case "fullscraperv2": {
+          const group = params.groupLink || "";
+          const count = Number(params.count || 500);
+          if (!group) return { ok: false, output: "رابط المجموعة مطلوب" };
+          addLog(`📊 استخراج شامل من: ${group}`);
+          try {
+            const members = await scrapeFullMembers(client, group, count);
+            addLog(`✓ ${members.length} عضو بمعلومات كاملة`);
+            const csv = members.map(m => `${m.id}|${m.access_hash}|${m.first_name}|${m.last_name}|${m.username}|${m.is_premium ? "premium" : "normal"}|${m.status}`).join("\n");
+            return { ok: true, output: log.join("\n") + "\n\n--- النتائج ---\n" + csv };
+          } catch (e: any) { return { ok: false, output: `❌ ${e.message?.substring(0, 150)}` }; }
+        }
+
+        case "reportspamuser": {
+          const username = params.username || "";
+          if (!username) return { ok: false, output: "اليوزر مطلوب" };
+          try {
+            const entity = await client.getEntity(username);
+            await client.invoke(new Api.account.ReportPeer({ peer: entity, reason: new Api.InputReportReasonSpam(), message: params.message || "Spam" } as any));
+            return { ok: true, output: `✓ بلاغ سبام عن ${username}` };
+          } catch (e: any) { return { ok: false, output: `❌ ${e.message?.substring(0, 80)}` }; }
+        }
+
+        case "scamtag": {
+          const result = await sendDirectMessage(client, "SpamBot", params.message || "Report");
+          return result.ok ? { ok: true, output: "✓ أُرسل لـ @SpamBot" } : { ok: false, output: `❌ ${result.error}` };
+        }
+
+        case "sendscamreport": {
+          const result = await sendDirectMessage(client, "notoscam", params.message || "Report");
+          return result.ok ? { ok: true, output: "✓ أُرسل لـ @notoscam" } : { ok: false, output: `❌ ${result.error}` };
         }
 
         default:
