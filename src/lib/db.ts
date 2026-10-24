@@ -87,6 +87,11 @@ export async function ensureSchema() {
   // ─── Approval system column ───
   // status: 'pending' (بانتظار موافقة المطور), 'approved' (مقبول), 'rejected' (مرفوض)
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'`;
+  // ─── SaaS: Trial + Banned ───
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_starts_at BIGINT DEFAULT 0`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS trial_expires_at BIGINT DEFAULT 0`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN DEFAULT FALSE`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_reason TEXT`;
   await sql`
     CREATE TABLE IF NOT EXISTS usage_log (
       id SERIAL PRIMARY KEY,
@@ -113,6 +118,47 @@ export async function ensureSchema() {
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS idx_blacklist_owner ON blacklist(owner_id)`;
+  // ─── SaaS: Orders table (طلبات الدفع) ───
+  await sql`
+    CREATE TABLE IF NOT EXISTS orders (
+      id TEXT PRIMARY KEY,
+      order_number TEXT UNIQUE NOT NULL,
+      user_id TEXT NOT NULL,
+      username TEXT,
+      plan TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      duration_days INTEGER NOT NULL,
+      status TEXT DEFAULT 'pending',
+      payment_link TEXT,
+      notes TEXT,
+      created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW()) * 1000,
+      confirmed_at BIGINT DEFAULT 0,
+      confirmed_by TEXT,
+      rejection_reason TEXT
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)`;
+  // ─── SaaS: Settings table (إعدادات ديناميكية) ───
+  await sql`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW()) * 1000,
+      updated_by TEXT
+    )
+  `;
+  // ─── إدراج إعدادات افتراضية (لو غير موجودة) ───
+  await sql`
+    INSERT INTO settings (key, value) VALUES
+      ('payment_link', 'https://t.me/your_payment_username'),
+      ('price_1m', '100'),
+      ('price_3m', '200'),
+      ('price_1y', '500'),
+      ('trial_days', '3'),
+      ('currency', 'USD')
+    ON CONFLICT (key) DO NOTHING
+  `;
   initialized = true;
 }
 

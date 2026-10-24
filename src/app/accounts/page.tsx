@@ -29,6 +29,9 @@ export default function AccountsPage() {
   useEffect(() => {
     fetch("/api/auth/me").then(r => r.json()).then(d => {
       if (!d.ok) { router.push("/login"); return; }
+      // 🛡️ SaaS: فحص الاشتراك
+      const state = d.user.subscriptionState;
+      if (state === "banned" || state === "expired") { router.push("/subscribe"); return; }
       // التحقق من حالة الموافقة
       if (d.user.role !== "admin" && (d.user.status === "pending" || d.user.status === "rejected")) {
         router.push("/pending"); return;
